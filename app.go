@@ -13,19 +13,16 @@ func Start() error {
 		return err
 	}
 
-	// Run http server
-	httpServerErrChan := make(chan error)
-	go func() {
-		err := StartHttpServer()
-		if err != nil {
-			httpServerErrChan <- err
-		}
-	}()
-
-	// Run module in parallel
+	// Run moduleInfo in parallel
 	moduleErrChan := make(chan error)
-	for _, module := range GetModules() {
-		module := module.New()
+	for _, moduleInfo := range GetModules() {
+		// Check dependencies
+		for _, requiredModule := range moduleInfo.RequiredModules {
+			if _, err := GetModule(requiredModule); err != nil {
+				return fmt.Errorf(`module "%s" required module "%s" to be present`, moduleInfo.ID, requiredModule)
+			}
+		}
+		module := moduleInfo.New()
 		go func() {
 			err := module.Start()
 			if err != nil {
@@ -40,8 +37,6 @@ func Start() error {
 	select {
 	case <-ctx.Done():
 		fmt.Println("TODO GRACEFULL SHUTDOWN")
-	case err := <-httpServerErrChan:
-		return err
 	case err := <-moduleErrChan:
 		return err
 	}

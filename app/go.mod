@@ -10,9 +10,15 @@ replace github.com/quix-labs/thunder/source-drivers/postgresql_wal => ../source-
 
 replace github.com/quix-labs/thunder/modules/frontend => ../modules/frontend
 
+replace github.com/quix-labs/thunder/modules/http_server => ../modules/http_server
+
+replace github.com/quix-labs/thunder/modules/api => ../modules/api
+
 require (
 	github.com/quix-labs/thunder v0.0.0-00010101000000-000000000000
+	github.com/quix-labs/thunder/modules/api v0.0.0-00010101000000-000000000000
 	github.com/quix-labs/thunder/modules/frontend v0.0.0-00010101000000-000000000000
+	github.com/quix-labs/thunder/modules/http_server v0.0.0-00010101000000-000000000000
 	github.com/quix-labs/thunder/source-drivers/postgresql_trigger v0.0.0-00010101000000-000000000000
 	github.com/quix-labs/thunder/source-drivers/postgresql_wal v0.0.0-00010101000000-000000000000
 )

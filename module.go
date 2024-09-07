@@ -7,8 +7,9 @@ import (
 )
 
 type ModuleInfo struct {
-	ID  string
-	New func() Module
+	ID              string
+	New             func() Module
+	RequiredModules []string
 }
 
 type Module interface {

@@ -1,4 +1,4 @@
-module github.com/quix-labs/thunder/modules/frontend
+module github.com/quix-labs/thunder/modules/api
 
 go 1.23.0
 

@@ -3,7 +3,6 @@ package frontend
 import (
 	"bytes"
 	"embed"
-	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -12,24 +11,10 @@ import (
 	"strings"
 )
 
-func Start() error {
-	fmt.Println("Server listening on port :3000")
-	fmt.Println("Access http://localhost:3000")
-
-	srv := &http.Server{
-		Addr:    ":3000",
-		Handler: router(),
-	}
-
-	return srv.ListenAndServe()
-}
-
 //go:embed all:build
 var StaticFiles embed.FS
 
-func router() http.Handler {
-	mux := http.NewServeMux()
-
+func HandleFrontend(mux *http.ServeMux) {
 	// static files
 	staticFS, _ := fs.Sub(StaticFiles, "build")
 	mux.Handle("/", FileServerWith404(http.FS(staticFS), func(w http.ResponseWriter, r *http.Request) (doDefaultFileServe bool) {
@@ -57,18 +42,12 @@ func router() http.Handler {
 		http.ServeContent(w, r, fileInfo.Name(), fileInfo.ModTime(), bytes.NewReader(content))
 		return
 	}))
-
-	SourceRoutes(mux)
-	SourceDriverRoutes(mux)
-	ProcessorRoutes(mux)
-
-	return mux
 }
 
 type FSHandler404 = func(w http.ResponseWriter, r *http.Request) (doDefaultFileServe bool)
 
 func FileServerWith404(root http.FileSystem, handler404 FSHandler404) http.Handler {
-	fs := http.FileServer(root)
+	fileServer := http.FileServer(root)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upath := r.URL.Path
@@ -94,6 +73,6 @@ func FileServerWith404(root http.FileSystem, handler404 FSHandler404) http.Handl
 			f.Close()
 		}
 
-		fs.ServeHTTP(w, r)
+		fileServer.ServeHTTP(w, r)
 	})
 }

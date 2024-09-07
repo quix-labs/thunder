@@ -10,6 +10,17 @@
 				"Database": "devdb",
 				"Schema": "public"
 			}
+		},
+		{
+			"driver": "postgresql_wal",
+			"config": {
+				"Host": "localhost",
+				"Port": 5432,
+				"User": "ss",
+				"Password": "ss",
+				"Database": "ss",
+				"Schema": "public"
+			}
 		}
 	],
 	"processors": [

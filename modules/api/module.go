@@ -1,8 +1,9 @@
-package frontend
+package api
 
 import (
 	"errors"
 	"github.com/quix-labs/thunder"
+	"github.com/quix-labs/thunder/modules/api/controllers"
 	"github.com/quix-labs/thunder/modules/http_server"
 	"net/http"
 )
@@ -16,17 +17,16 @@ type Module struct{}
 
 func (m *Module) ThunderModule() thunder.ModuleInfo {
 	return thunder.ModuleInfo{
-		ID:  "thunder.frontend",
-		New: func() thunder.Module { return new(Module) },
-		RequiredModules: []string{
-			"thunder.http_server",
-			"thunder.api",
-		},
+		ID:              "thunder.api",
+		New:             func() thunder.Module { return new(Module) },
+		RequiredModules: []string{"thunder.http_server"},
 	}
 }
 
 func (m *Module) HandleRoutes(mux *http.ServeMux) {
-	HandleFrontend(mux)
+	controllers.SourceRoutes(mux)
+	controllers.SourceDriverRoutes(mux)
+	controllers.ProcessorRoutes(mux)
 }
 
 func (m *Module) Start() error {

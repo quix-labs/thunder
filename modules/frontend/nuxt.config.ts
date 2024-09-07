@@ -1,6 +1,5 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-
     compatibilityDate: '2024-04-03',
     devtools: {enabled: true},
     vue: {
@@ -8,7 +7,7 @@ export default defineNuxtConfig({
     },
     nitro: {
         output: {
-            publicDir: '../build',
+            publicDir: './build',
         },
         routeRules: {
             '/go-api/**': {proxy: 'http://localhost:3000/go-api/**'}

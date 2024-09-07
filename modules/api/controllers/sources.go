@@ -1,24 +1,24 @@
-package frontend
+package controllers
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/quix-labs/thunder"
+	"github.com/quix-labs/thunder/modules/http_server"
 	"log"
 	"net/http"
 	"strconv"
 )
 
 func SourceRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /go-api/sources", listSources)
-	mux.HandleFunc("POST /go-api/sources", createSource)
-	mux.HandleFunc("DELETE /go-api/sources/{id}", deleteSource)
-
-	mux.HandleFunc("GET /go-api/sources/{id}/stats", getSourceStats)
+	mux.HandleFunc("GET /go-api/sources", ListSources)
+	mux.HandleFunc("POST /go-api/sources", CreateSource)
+	mux.HandleFunc("DELETE /go-api/sources/{id}", DeleteSource)
+	mux.HandleFunc("GET /go-api/sources/{id}/stats", GetSourceStats)
 }
 
-func getSourceStats(w http.ResponseWriter, r *http.Request) {
+func GetSourceStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
@@ -55,7 +55,7 @@ func getSourceStats(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func deleteSource(w http.ResponseWriter, r *http.Request) {
+func DeleteSource(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	id, err := strconv.Atoi(r.PathValue("id"))
@@ -78,7 +78,7 @@ func deleteSource(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func listSources(w http.ResponseWriter, r *http.Request) {
+func ListSources(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	b, err := json.Marshal(thunder.GetConfig().Sources)
@@ -90,18 +90,18 @@ func listSources(w http.ResponseWriter, r *http.Request) {
 
 	w.Write(b)
 }
-func createSource(w http.ResponseWriter, r *http.Request) {
+func CreateSource(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var p struct {
 		Driver string `json:"driver"`
 		Config any    `json:"config"`
 	}
-	err := decodeJSONBody(w, r, &p)
+	err := http_server.DecodeJSONBody(w, r, &p)
 	if err != nil {
-		var mr *malformedRequest
+		var mr *http_server.MalformedRequest
 		if errors.As(err, &mr) {
-			http.Error(w, mr.msg, mr.status)
+			http.Error(w, mr.Msg, mr.Status)
 		} else {
 			log.Print(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

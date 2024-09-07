@@ -1,10 +1,11 @@
-package frontend
+package controllers
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/quix-labs/thunder"
+	"github.com/quix-labs/thunder/modules/http_server"
 	"log"
 	"net/http"
 	"strconv"
@@ -39,11 +40,11 @@ func createProcessor(w http.ResponseWriter, r *http.Request) {
 
 	var p thunder.Processor
 
-	err := decodeJSONBody(w, r, &p)
+	err := http_server.DecodeJSONBody(w, r, &p)
 	if err != nil {
-		var mr *malformedRequest
+		var mr *http_server.MalformedRequest
 		if errors.As(err, &mr) {
-			http.Error(w, mr.msg, mr.status)
+			http.Error(w, mr.Msg, mr.Status)
 		} else {
 			log.Print(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
