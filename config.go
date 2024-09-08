@@ -2,6 +2,8 @@ package thunder
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"sync"
 )
@@ -9,15 +11,6 @@ import (
 type Source struct {
 	Driver string `json:"driver"`
 	Config any    `json:"config"`
-}
-
-type Processor struct {
-	Source int    `json:"source"`
-	Table  string `json:"table"`
-
-	Mapping []any `json:"mapping"`
-
-	Index string `json:"index"`
 }
 
 type Config struct {
@@ -44,6 +37,13 @@ func SetConfigPath(newPath string) {
 }
 
 func LoadConfig() error {
+	if _, err := os.Stat(GetConfigPath()); errors.Is(err, os.ErrNotExist) {
+		fmt.Println("config file doesn't exists, ignore load")
+		return nil
+	} else if err != nil {
+		return err
+	}
+
 	content, err := os.ReadFile(GetConfigPath())
 	if err != nil {
 		return err

@@ -3,10 +3,12 @@ package postgresql_wal
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"errors"
-	"github.com/jackc/pgconn"
+	"fmt"
+	"github.com/jackc/pgx/v5"
 	"github.com/quix-labs/thunder"
+	"strconv"
+	"time"
 )
 
 func init() {
@@ -21,7 +23,11 @@ type DriverConfig struct {
 	Database string `required:"true"`
 	Schema   string `default:"public"`
 }
-type Driver struct{}
+
+type Driver struct {
+	config *DriverConfig
+	conn   *pgx.Conn
+}
 
 //go:embed icon.svg
 var logo string
@@ -62,11 +68,12 @@ func (d *Driver) Stats(config any) (*thunder.SourceDriverStats, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer pgConn.Close(context.Background())
 
-	rows := pgConn.ExecParams(context.Background(), `SELECT
+	query := `SELECT
     table_name as name,
-    JSON_AGG(column_name)::TEXT AS columns,
-    TO_JSON(ARRAY_AGG(column_name) FILTER (WHERE primary_key))::TEXT AS primarykey
+    JSON_AGG(column_name) AS columns,
+    TO_JSON(ARRAY_AGG(column_name) FILTER (WHERE primary_key)) AS primary_keys
 FROM (
          SELECT
              pgc.relname AS table_name,
@@ -87,33 +94,60 @@ FROM (
            	AND NOT a.attisdropped
      ) AS subquery
 GROUP BY table_name
-ORDER BY table_name;`, nil, nil, nil, nil)
+ORDER BY table_name`
 
 	stats := thunder.SourceDriverStats{}
-	for rows.NextRow() {
-		tableName := string(rows.Values()[0])
-		var columns []string
-		var primaryKeys []string
-
-		_ = json.Unmarshal(rows.Values()[1], &columns)
-		_ = json.Unmarshal(rows.Values()[2], &primaryKeys)
-
-		stats[tableName] = thunder.SourceDriverStatsTable{
-			Columns:     columns,
-			PrimaryKeys: primaryKeys,
-		}
+	type RowResult struct {
+		Name        string   `json:"name"`
+		Columns     []string `json:"columns"`
+		PrimaryKeys []string `json:"primary_keys"`
 	}
 
-	_, err = rows.Close()
+	results, err := GetResultsSync[RowResult](pgConn, query, time.Second*10)
 	if err != nil {
 		return nil, err
 	}
-
+	for _, result := range results {
+		stats[result.Name] = thunder.SourceDriverStatsTable{
+			Columns:     result.Columns,
+			PrimaryKeys: result.PrimaryKeys,
+		}
+	}
 	return &stats, nil
 }
 
-func (d *Driver) GetConn(cfg *DriverConfig) (*pgconn.PgConn, error) {
-	pgConnConfig, err := pgconn.ParseConfig("")
+func (d *Driver) Start(config any) error {
+	var ok bool
+	if d.config, ok = config.(*DriverConfig); !ok {
+		return errors.New("invalid config type")
+	}
+	var err error
+	if d.conn, err = d.GetConn(d.config); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, limit uint64) (<-chan *thunder.Document, <-chan error) {
+	query, err := GetSqlForMapping(processor.Table, &processor.Mapping)
+	if err != nil {
+		panic(err)
+	}
+	if limit > 0 {
+		query = fmt.Sprintf("%s LIMIT %s", query, strconv.FormatUint(limit, 10))
+	}
+	return GetResultsChan[thunder.Document](d.conn, query)
+}
+
+func (d *Driver) Stop() error {
+	if d.conn != nil {
+		return d.conn.Close(context.Background())
+	}
+	return nil
+}
+
+func (d *Driver) GetConn(cfg *DriverConfig) (*pgx.Conn, error) {
+	pgConnConfig, err := pgx.ParseConfig("")
 	if err != nil {
 		return nil, err
 	}
@@ -123,11 +157,10 @@ func (d *Driver) GetConn(cfg *DriverConfig) (*pgconn.PgConn, error) {
 	pgConnConfig.Password = cfg.Password
 	pgConnConfig.Database = cfg.Database
 
-	pgConn, err := pgconn.ConnectConfig(context.Background(), pgConnConfig)
+	pgConn, err := pgx.ConnectConfig(context.Background(), pgConnConfig)
 	if err != nil {
 		return nil, err
 	}
-	//defer pgConn.Close(context.Background()) // TODO OUTSIDE OR RETURN CLOSE
 	return pgConn, nil
 }
 

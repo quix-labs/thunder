@@ -26,12 +26,17 @@ type SourceDriverStatsTable struct {
 }
 
 type SourceDriverStats map[string]SourceDriverStatsTable
+type Document map[string]interface{}
 
 type SourceDriver interface {
 	ThunderSourceDriver() SourceDriverInfo
 
 	TestConfig(config any) (string, error)
 	Stats(config any) (*SourceDriverStats, error)
+
+	Start(config any) error
+	GetDocumentsForProcessor(processor *Processor, limit uint64) (<-chan *Document, <-chan error)
+	Stop() error
 }
 
 // UTILITIES FUNCTIONS

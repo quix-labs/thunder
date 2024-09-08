@@ -30,3 +30,4 @@ go.work.sum
 coverage.*
 
 /dist
+config.local.json

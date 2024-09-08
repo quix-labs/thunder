@@ -94,7 +94,8 @@ func listSourceDrivers(w http.ResponseWriter, r *http.Request) {
 
 	jsonData, err := json.Marshal(res)
 	if err != nil {
-		fmt.Printf("could not marshal json: %s\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
 		return
 	}
 

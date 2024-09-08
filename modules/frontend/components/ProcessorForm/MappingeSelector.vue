@@ -64,22 +64,6 @@
                 <USelectMenu v-model="mapped.pivot_table" :options="Object.keys(stats||{})" searchable/>
               </UFormGroup>
 
-
-              <UFormGroup label="Foreign Pivot key" required>
-                <div class="flex">
-                  <UKbd class="h-auto p-2 pointer-events-none select-none rounded-r-none border-l-0">
-                    {{ mapped.pivot_table }}.
-                  </UKbd>
-                  <USelectMenu
-                      v-model="mapped.foreign_pivot_key"
-                      class="w-full"
-                      :ui="{rounded:'rounded-md rounded-l-none'}"
-                      :options="stats?.[mapped.pivot_table]?.columns || []"
-                      searchable
-                  />
-                </div>
-              </UFormGroup>
-
               <UFormGroup label="Local Pivot key" required>
                 <div class="flex">
                   <UKbd class="h-auto p-2 pointer-events-none select-none rounded-r-none border-l-0">
@@ -95,7 +79,20 @@
                 </div>
               </UFormGroup>
 
-
+              <UFormGroup label="Foreign Pivot key" required>
+                <div class="flex">
+                  <UKbd class="h-auto p-2 pointer-events-none select-none rounded-r-none border-l-0">
+                    {{ mapped.pivot_table }}.
+                  </UKbd>
+                  <USelectMenu
+                      v-model="mapped.foreign_pivot_key"
+                      class="w-full"
+                      :ui="{rounded:'rounded-md rounded-l-none'}"
+                      :options="stats?.[mapped.pivot_table]?.columns || []"
+                      searchable
+                  />
+                </div>
+              </UFormGroup>
             </template>
             <UDivider label="Pivot Configuration End"/>
           </template>
