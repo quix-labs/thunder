@@ -4,9 +4,7 @@ go 1.23.0
 
 replace github.com/quix-labs/thunder => ../
 
-replace github.com/quix-labs/thunder/source-drivers/postgresql_trigger => ../source-drivers/postgresql_trigger
-
-replace github.com/quix-labs/thunder/source-drivers/postgresql_wal => ../source-drivers/postgresql_wal
+replace github.com/quix-labs/thunder/source-drivers/postgresql_flash => ../source-drivers/postgresql_flash
 
 replace github.com/quix-labs/thunder/modules/frontend => ../modules/frontend
 
@@ -19,7 +17,7 @@ require (
 	github.com/quix-labs/thunder/modules/api v0.0.0-00010101000000-000000000000
 	github.com/quix-labs/thunder/modules/frontend v0.0.0-00010101000000-000000000000
 	github.com/quix-labs/thunder/modules/http_server v0.0.0-00010101000000-000000000000
-	github.com/quix-labs/thunder/source-drivers/postgresql_wal v0.0.0-00010101000000-000000000000
+	github.com/quix-labs/thunder/source-drivers/postgresql_flash v0.0.0-00010101000000-000000000000
 )
 
 require (

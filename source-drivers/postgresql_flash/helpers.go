@@ -1,4 +1,4 @@
-package postgresql_wal
+package postgresql_flash
 
 import (
 	"context"

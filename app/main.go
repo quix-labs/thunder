@@ -5,8 +5,7 @@ import (
 	_ "github.com/quix-labs/thunder/modules/api"
 	_ "github.com/quix-labs/thunder/modules/frontend"
 	_ "github.com/quix-labs/thunder/modules/http_server"
-	//_ "github.com/quix-labs/thunder/source-drivers/postgresql_trigger"
-	_ "github.com/quix-labs/thunder/source-drivers/postgresql_wal"
+	_ "github.com/quix-labs/thunder/source-drivers/postgresql_flash"
 )
 
 func main() {

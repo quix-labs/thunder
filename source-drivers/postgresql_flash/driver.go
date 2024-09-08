@@ -1,4 +1,4 @@
-package postgresql_wal
+package postgresql_flash
 
 import (
 	"context"
@@ -34,10 +34,10 @@ var logo string
 
 func (d *Driver) ThunderSourceDriver() thunder.SourceDriverInfo {
 	return thunder.SourceDriverInfo{
-		ID:  "postgresql_wal",
+		ID:  "postgresql_flash",
 		New: func() thunder.SourceDriver { return new(Driver) },
 
-		Name:   "PostgreSQL (WAL)",
+		Name:   "PostgreSQL (Flash)",
 		Image:  logo,
 		Config: DriverConfig{},
 		Notes:  []string{"Please be sure wal_replication is set to logical on your PostgreSQL config"},
