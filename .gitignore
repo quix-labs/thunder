@@ -30,5 +30,5 @@ go.work.sum
 coverage.*
 
 /dist
-config.local.json
+config.json
 *.private.*
