@@ -1,14 +1,5 @@
 <template>
-  <div :class="{'short-mode':shortMode}">
-    <label class="flex items-center justify-end mb-2 gap-x-4 cursor-pointer">
-      Short Mode (beta):
-      <UToggle
-          on-icon="i-heroicons-check-20-solid"
-          off-icon="i-heroicons-x-mark-20-solid"
-          v-model="shortMode"
-      />
-    </label>
-
+  <div :class="{'short-mode':state.shortMode}">
     <ProcessorFormMappingeSelector
         :source="form.source"
         :table="form.table"
@@ -28,17 +19,15 @@ watch(state.value, (current, old) => {
   if (!import.meta.client) return;
   if (actualMappingPath === current.activeMappingPath) return;
   actualMappingPath = current.activeMappingPath
-
   if (state.value.preventScroll) return;
 
-  console.log('here')
-  setTimeout(() => {
+  nextTick(() => {
     document.getElementById('mapping-' + current.activeMappingPath)?.scrollIntoView({
       block: 'start',
       inline: 'start',
-      behavior: 'smooth'
+      behavior: 'instant',
     })
-  }, 100)
+  })
 })
 </script>
 

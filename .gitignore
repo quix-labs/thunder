@@ -32,3 +32,4 @@ coverage.*
 /dist
 config.json
 *.private.*
+/dev

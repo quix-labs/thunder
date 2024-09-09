@@ -34,8 +34,24 @@ var logo string
 
 func (d *Driver) ThunderSourceDriver() thunder.SourceDriverInfo {
 	return thunder.SourceDriverInfo{
-		ID:  "postgresql_flash",
-		New: func() thunder.SourceDriver { return new(Driver) },
+		ID: "postgresql_flash",
+		New: func(config any) (thunder.SourceDriver, error) {
+
+			cfg, ok := config.(*DriverConfig)
+			if !ok {
+				return nil, errors.New("invalid config type")
+			}
+
+			pgConn, err := d.newConn(cfg)
+			if err != nil {
+				return nil, err
+			}
+
+			return &Driver{
+				config: cfg,
+				conn:   pgConn,
+			}, nil
+		},
 
 		Name:   "PostgreSQL (Flash)",
 		Image:  logo,
@@ -44,58 +60,16 @@ func (d *Driver) ThunderSourceDriver() thunder.SourceDriverInfo {
 	}
 }
 
-func (d *Driver) TestConfig(config any) (string, error) {
-	cfg, ok := config.(*DriverConfig)
-	if !ok {
-		return "", errors.New("invalid config type")
-	}
-
-	pgConn, err := d.GetConn(cfg)
+func (d *Driver) TestConfig() (string, error) {
+	stats, err := d.Stats()
 	if err != nil {
-		return "Cannot connect to database", err
+		return "cannot get field table statistics", err
 	}
-	defer pgConn.Close(context.Background())
-
-	return "Successfully connected", nil
+	return fmt.Sprintf("Successfully connected, discover %d tables", len(*stats)), nil
 }
 
-func (d *Driver) Stats(config any) (*thunder.SourceDriverStats, error) {
-	cfg, ok := config.(*DriverConfig)
-	if !ok {
-		return nil, errors.New("invalid config type")
-	}
-	pgConn, err := d.GetConn(cfg)
-	if err != nil {
-		return nil, err
-	}
-	defer pgConn.Close(context.Background())
-
-	query := `SELECT
-    table_name as name,
-    JSON_AGG(column_name) AS columns,
-    TO_JSON(ARRAY_AGG(column_name) FILTER (WHERE primary_key)) AS primary_keys
-FROM (
-         SELECT
-             pgc.relname AS table_name,
-             a.attname AS column_name,
-             COALESCE(i.indisprimary, false) AS primary_key
-         FROM
-             pg_attribute a
-                 JOIN pg_class pgc ON pgc.oid = a.attrelid
-                 LEFT JOIN pg_index i ON (pgc.oid = i.indrelid AND a.attnum = ANY(i.indkey))
-                 LEFT JOIN pg_catalog.pg_namespace n ON n.oid = pgc.relnamespace
-         WHERE
-        	pgc.relkind IN ('r', '')  -- Relkind for tables
-            AND n.nspname <> 'pg_catalog'
-        	AND n.nspname <> 'information_schema'
-           	AND n.nspname !~ '^pg_toast'
-           	AND a.attnum > 0
-           	AND pg_table_is_visible(pgc.oid)
-           	AND NOT a.attisdropped
-     ) AS subquery
-GROUP BY table_name
-ORDER BY table_name`
-
+func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
+	query := StatsQuery(d.config.Schema)
 	stats := thunder.SourceDriverStats{}
 	type RowResult struct {
 		Name        string   `json:"name"`
@@ -103,7 +77,7 @@ ORDER BY table_name`
 		PrimaryKeys []string `json:"primary_keys"`
 	}
 
-	results, err := GetResultsSync[RowResult](pgConn, query, time.Second*10)
+	results, err := GetResultsSync[RowResult](d.conn, query, time.Second*10, false)
 	if err != nil {
 		return nil, err
 	}
@@ -116,18 +90,6 @@ ORDER BY table_name`
 	return &stats, nil
 }
 
-func (d *Driver) Start(config any) error {
-	var ok bool
-	if d.config, ok = config.(*DriverConfig); !ok {
-		return errors.New("invalid config type")
-	}
-	var err error
-	if d.conn, err = d.GetConn(d.config); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, limit uint64) (<-chan *thunder.Document, <-chan error) {
 	query, err := GetSqlForMapping(processor.Table, &processor.Mapping)
 	if err != nil {
@@ -136,7 +98,13 @@ func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, limit ui
 	if limit > 0 {
 		query = fmt.Sprintf("%s LIMIT %s", query, strconv.FormatUint(limit, 10))
 	}
-	return GetResultsChan[thunder.Document](d.conn, query)
+
+	return GetResultsChan[thunder.Document](d.conn, query, false)
+}
+
+func (d *Driver) Start() error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (d *Driver) Stop() error {
@@ -146,7 +114,14 @@ func (d *Driver) Stop() error {
 	return nil
 }
 
-func (d *Driver) GetConn(cfg *DriverConfig) (*pgx.Conn, error) {
+func (d *Driver) Shutdown() error {
+	if d.conn != nil {
+		return d.conn.Close(context.Background())
+	}
+	return nil
+}
+
+func (d *Driver) newConn(cfg *DriverConfig) (*pgx.Conn, error) {
 	pgConnConfig, err := pgx.ParseConfig("")
 	if err != nil {
 		return nil, err

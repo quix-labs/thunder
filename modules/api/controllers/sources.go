@@ -24,11 +24,13 @@ func GetSourceStats(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"ID is not an integer"}`)))
+		return
 	}
 
 	if (id + 1) > len(thunder.GetConfig().Sources) {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"Invalid source"}`)))
+		return
 	}
 
 	source := thunder.GetConfig().Sources[id]
@@ -37,9 +39,21 @@ func GetSourceStats(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		return
 	}
 
-	stats, err := driver.New().Stats(source.Config)
+	driverInstance, err := driver.New(source.Config)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		bytes, _ := json.Marshal(struct {
+			Success bool   `json:"success"`
+			Error   string `json:"error"`
+		}{Success: false, Error: err.Error()})
+		w.Write(bytes)
+		return
+	}
+
+	stats, err := driverInstance.Stats()
 	if err != nil {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		bytes, _ := json.Marshal(struct {
@@ -62,6 +76,7 @@ func DeleteSource(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"ID is not an integer"}`)))
+		return
 	}
 
 	config := thunder.GetConfig()

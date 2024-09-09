@@ -49,7 +49,7 @@
                 :required="field.required"
                 :label="field.label"
                 :name="`config.${field.name}`"
-                :help="field.help">
+                :help="field.as">
 
               <UInput
                   type="number" :placeholder="field.default" v-if="['number'].includes(field.type)"
@@ -156,7 +156,7 @@ const sendTestRequest = async () => {
     return
   }
 
-  if (status.value === 'error' && error.value?.statusCode === 400) {
+  if (status.value === 'error' && [400,422]?.includes(error.value?.statusCode||0)) {
     const serverData = error.value.data as { error?: string }
     useToast().add({title: 'Error', description: serverData.error, color: 'red'})
   }

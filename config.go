@@ -61,7 +61,6 @@ func LoadConfig() error {
 			if typedConfig, err := ConvertSourceDriverConfig(&driver, source.Config); err == nil {
 				config.Sources[idx].Config = typedConfig
 			}
-
 		}
 	}
 	return nil

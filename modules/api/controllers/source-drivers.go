@@ -51,7 +51,18 @@ func testSourceDriver(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TRY TEST
-	message, err := driver.New().TestConfig(configInstance)
+	driverInstance, err := driver.New(configInstance)
+	if err != nil {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		bytes, _ := json.Marshal(struct {
+			Success bool   `json:"success"`
+			Error   string `json:"error"`
+		}{Success: false, Error: err.Error()})
+		w.Write(bytes)
+		return
+	}
+
+	message, err := driverInstance.TestConfig()
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		bytes, _ := json.Marshal(struct {

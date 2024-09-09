@@ -1,40 +1,75 @@
 <template>
-  <USlideover v-model="opened" class="overflow-y-auto"
-              :ui="mode==='read'?{width: 'w-screen max-w-[25vw]'}:{width: 'w-screen max-w-[50vw]'}">
-    <div class="grid min-h-screen grid-rows-[auto_1fr_auto]" :class="{'grid-cols-2':mode!=='read'}">
+  <section class="flex flex-col flex-1 relative">
 
-      <h2 @click.prevent="submit" class="col-span-full mx-4 mt-4 text-center text-2xl font-semibold">
-        {{ {create: `New processor`, edit: `Edit processor: TODO id`, read: 'Processor: TODO id'}[mode] }}
-      </h2>
+    <USlideover v-model="opened" class="overflow-y-auto"
+                @keydown.ctrl.enter.prevent="submit"
+                :ui="state.showSamplePanel
+                ?(mode==='read'?{width: 'w-screen max-w-[40vw]'}:{width: 'w-screen max-w-[70vw]'})
+                :(mode==='read'?{width: 'w-screen max-w-[25vw]'}:{width: 'w-screen max-w-[55vw]'})">
 
-      <ProcessorFormLeftPanel v-model:form="form" :class="{'':mode==='read'}"/>
-      <ProcessorFormRightPanel v-model:form="form" v-if="mode!=='read'"/>
+      <div class="grid min-h-screen grid-rows-[auto_1fr_auto]"
+           :class="{
+              'grid-cols-[2fr_3fr]':mode!=='read' && !state.showSamplePanel,
+              'grid-cols-[2fr_3fr_15vw]':mode!=='read' && state.showSamplePanel,
+              'grid-cols-[1fr_15vw]':state.showSamplePanel && mode=='read'
 
-      <template v-if="mode!=='read'">
-        <!--        <UDivider label="Actions" class="col-span-full "/>-->
-        <UButton @click.prevent="submit" size="xl" block class="col-span-full" :ui="{rounded:''}">
+          }">
+
+        <!--Toolbar-->
+        <div class="col-span-full flex justify-between border-b p-4">
+          <h2 @click.prevent="submit" class="col-span-full  text-center text-2xl font-semibold">
+            {{ {create: `New processor`, edit: `Edit processor: TODO id`, read: 'Processor: TODO id'}[mode] }}
+          </h2>
+          <div class="flex gap-x-4">
+            <label class="flex items-center gap-x-4 cursor-pointer" v-if="mode!=='read'">
+              Short Mode (beta):
+              <UToggle
+                  on-icon="i-heroicons-check-20-solid"
+                  off-icon="i-heroicons-x-mark-20-solid"
+                  v-model="state.shortMode"
+              />
+            </label>
+            <label class="flex items-center gap-x-4 cursor-pointer ">
+              Sample Tab:
+              <UToggle
+                  on-icon="i-heroicons-check-20-solid"
+                  off-icon="i-heroicons-x-mark-20-solid"
+                  v-model="state.showSamplePanel"
+              />
+            </label>
+          </div>
+
+        </div>
+
+
+        <ProcessorFormLeftPanel v-model:form="form"/>
+        <LazyProcessorFormRightPanel v-model:form="form" v-if="mode!=='read'"/>
+        <LazyProcessorFormSamplePanel v-model:form="form" v-if="state.showSamplePanel"/>
+
+        <!--Full Width save button-->
+        <UButton class="col-span-full" @click.prevent="submit" size="xl" block :ui="{rounded:''}" v-if="mode!=='read'">
           {{ {create: 'Create', edit: 'Save changes'}[mode] }}
         </UButton>
-      </template>
 
-
-    </div>
-
-    <!-- TODO SUBMIT -->
-  </USlideover>
+      </div>
+    </USlideover>
+  </section>
 </template>
 
 <script setup lang="ts">
 
+
 const opened = defineModel('opened')
 const $emit = defineEmits(['created', 'updated'])
+const state = useProcessFormState()
 
 interface Props {
   mode: "create" | "edit" | "read"
   processor?: any
+  processorId?: number
 }
 
-const {mode = "create", processor} = defineProps<Props>()
+const {mode = "create", processor, processorId} = defineProps<Props>()
 
 const defaultForm = reactive({
   source: null as number | null,
@@ -44,23 +79,38 @@ const defaultForm = reactive({
 })
 
 const form = computed(() => processor || defaultForm)
+
 const submit = async () => {
-  if (mode === "edit") {
-    useToast().add({title: 'Error', description: 'Edit endpoint not implemented', color: 'red'})
-    return
-  }
-  const {status, error, data} = await useGoFetch("/processors", {method: 'post', body: form, watch: false})
+  if (mode === "create") {
+    const {status, error, data} = await useGoFetch("/processors", {method: 'post', body: form, watch: false})
+    if (status.value === 'success') {
+      const serverData = data.value as { message?: string }
+      useToast().add({title: 'Success', color: 'green', description: serverData.message})
+      $emit('created')
+      opened.value = false
+      return
+    }
 
-  if (status.value === 'success') {
-    const serverData = data.value as { message?: string }
-    useToast().add({title: 'Success', color: 'green', description: serverData.message})
-    $emit('created')
-    opened.value = false
-    return
-  }
+    if (status.value === 'error') {
+      useToast().add({title: 'Error', description: error.value?.message, color: 'red'})
+    }
+  } else if (mode === "edit") {
+    const {status, error, data} = await useGoFetch(`/processors/${processorId}`, {
+      method: 'put',
+      body: form,
+      watch: false
+    })
+    if (status.value === 'success') {
+      const serverData = data.value as { message?: string }
+      useToast().add({title: 'Success', color: 'green', description: serverData.message})
+      $emit('updated')
+      opened.value = false
+      return
+    }
 
-  if (status.value === 'error') {
-    useToast().add({title: 'Error', description: error.value?.message, color: 'red'})
+    if (status.value === 'error') {
+      useToast().add({title: 'Error', description: error.value?.message, color: 'red'})
+    }
   }
 }
 </script>

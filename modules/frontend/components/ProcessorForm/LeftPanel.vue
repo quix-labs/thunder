@@ -40,7 +40,7 @@
           Describe how to transform your relational data into unstructured documents
         </p>
       </template>
-      <ProcessorFormMappingThree :mapping="form.mapping" :prefix="form.table"/>
+      <ProcessorFormMappingThree :mapping="form.mapping" :name="form.table" :as="form.index"/>
     </UCard>
 
     <!-- OUTPUT -->
@@ -60,7 +60,7 @@
         </p>
       </template>
       <p>Targets: "TODO Implement target and target drivers"[]</p>
-      <p>Index: {{ form.index}}</p>
+      <p>Index: {{ form.index }}</p>
     </UCard>
 
 

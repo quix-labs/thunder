@@ -10,8 +10,8 @@ import (
 )
 
 type SourceDriverInfo struct {
-	ID  string              `json:"ID"`
-	New func() SourceDriver `json:"-"`
+	ID  string                                 `json:"ID"`
+	New func(config any) (SourceDriver, error) `json:"-"`
 
 	Name   string `json:"name"`
 	Config any    `json:"-"`
@@ -26,17 +26,23 @@ type SourceDriverStatsTable struct {
 }
 
 type SourceDriverStats map[string]SourceDriverStatsTable
-type Document map[string]interface{}
+type Document struct {
+	Key  string `json:"id"`
+	Json []byte `json:"json"`
+}
 
 type SourceDriver interface {
 	ThunderSourceDriver() SourceDriverInfo
 
-	TestConfig(config any) (string, error)
-	Stats(config any) (*SourceDriverStats, error)
+	TestConfig() (string, error) // TODO USELESS REPLACE IN FAVOR OF STATS TO CHECK NOT EMPTY
+	Stats() (*SourceDriverStats, error)
 
-	Start(config any) error
 	GetDocumentsForProcessor(processor *Processor, limit uint64) (<-chan *Document, <-chan error)
+
+	Start() error
 	Stop() error
+
+	Shutdown() error
 }
 
 // UTILITIES FUNCTIONS
@@ -73,9 +79,6 @@ func RegisterSourceDriver(sourceDriver SourceDriver) {
 	}
 	if info.New == nil {
 		panic("source driver New function missing")
-	}
-	if val := info.New(); val == nil {
-		panic("SourceDriverInfo.New must return a non-nil source driver instance")
 	}
 
 	sourceDriversMu.Lock()

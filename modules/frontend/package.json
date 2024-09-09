@@ -19,6 +19,7 @@
     "@headlessui/vue": "^1.7.22",
     "@heroicons/vue": "^2.1.5",
     "mitt": "^3.0.1",
+    "vue-json-pretty": "^2.4.0",
     "zod": "^3.23.8"
   }
 }
