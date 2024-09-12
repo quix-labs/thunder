@@ -26,13 +26,9 @@ type SourceDriverStatsTable struct {
 }
 
 type SourceDriverStats map[string]SourceDriverStatsTable
-type Document struct {
-	Key  string `json:"id"`
-	Json []byte `json:"json"`
-}
 
 type SourceDriver interface {
-	ThunderSourceDriver() SourceDriverInfo
+	DriverInfo() SourceDriverInfo
 
 	TestConfig() (string, error) // TODO USELESS REPLACE IN FAVOR OF STATS TO CHECK NOT EMPTY
 	Stats() (*SourceDriverStats, error)
@@ -73,7 +69,7 @@ var (
 )
 
 func RegisterSourceDriver(sourceDriver SourceDriver) {
-	info := sourceDriver.ThunderSourceDriver()
+	info := sourceDriver.DriverInfo()
 	if info.ID == "" {
 		panic("source driver ID missing")
 	}

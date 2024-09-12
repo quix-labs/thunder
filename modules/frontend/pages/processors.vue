@@ -2,7 +2,7 @@
   <section>
     <UCard class="w-full" :ui="{
       divide: 'divide-y divide-gray-200 dark:divide-gray-700',
-      body: { padding: '', },
+      body: { padding: '' },
       header:{base:'flex gap-x-2 justify-between items-center'},
       footer:{base:'text-sm leading-5 text-center'}
     }">
@@ -29,12 +29,12 @@
           </template>
           <template #targets-data="{ row }">
             <div class="flex gap-1">
-              <UBadge size="xs" :label="target" color="sky" variant="subtle" v-for="target in row.targets"/>
+              <UBadge size="xs" :label="`Target n°${target}`" color="sky" variant="subtle" v-for="target in row.targets"/>
             </div>
           </template>
           <template #source-data="{ row }">
             <div class="flex gap-1">
-              <UBadge size="xs" :label="'TODO NAME '+row.source" color="sky" variant="subtle"/>
+              <UBadge size="xs" :label="`Source n°${row.source}`" color="sky" variant="subtle"/>
             </div>
           </template>
           <template #stats-data="{ row }">
@@ -42,6 +42,10 @@
               <UBadge size="xs" :label="`${row.stats.total} fields`" color="gray"/>
               <UBadge size="xs" :label="`${row.stats.relations} relations`" color="gray"/>
             </div>
+          </template>
+          <template #state-data="{ row }">
+            <UBadge size="xs" :label="row.state"
+                    :color="{listening:'green',inactive:'red',indexing:'sky'}[row.state] || 'gray'"/>
           </template>
         </UTable>
       </template>
@@ -73,15 +77,17 @@ const columns = [
   {key: 'index', label: 'Index', sortable: true},
   {key: 'targets', label: 'Targets', sortable: false},
   {key: 'stats', label: 'Stats', sortable: false},
+  {key: 'state', label: 'State', sortable: false},
   {key: 'actions', sortable: false, rowClass: 'w-[1px] whitespace-nowrap'}
 ]
 
 const rows = computed(() => processors.value?.map((processor, key) => ({
   id: key,
-  targets: ['todo', 'todo'],
+  targets: processor.targets,
   index: processor.index || '---',
   source: processor.source !== undefined ? processor.source : '---',
   stats: getMappingStats(processor.mapping || []),
+  state: 'inactive',
 })) || [])
 
 const getMappingStats = (mapping: any[]) => {
@@ -105,7 +111,7 @@ const formMode = ref<"create" | "edit" | "read">("create");
 const formProcessor = ref<any>();
 const formProcessorId = ref<number>();
 
-const createProcessor = async (id: number) => {
+const createProcessor = async () => {
   formMode.value = "create"
   formProcessor.value = undefined
   formProcessorId.value = undefined
@@ -114,7 +120,7 @@ const createProcessor = async (id: number) => {
 const showProcessor = async (id: number) => {
   formMode.value = "read"
   formProcessor.value = processors.value?.at(id)
-  formProcessorId.value = undefined
+  formProcessorId.value = id
   formOpened.value = true
 }
 const editProcessor = async (id: number) => {

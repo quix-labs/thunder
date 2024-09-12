@@ -48,7 +48,7 @@ import {Bars3Icon, XMarkIcon} from '@heroicons/vue/24/outline'
 
 const navigation = [
   {name: 'Dashboard', href: '/'},
-  {name: 'Data Sources', href: '/data-sources'},
+  {name: 'Sources', href: '/sources'},
   {name: 'Processors', href: '/processors'},
   {name: 'Targets', href: '/targets'},
 ]

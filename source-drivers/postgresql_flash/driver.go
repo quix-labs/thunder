@@ -32,7 +32,7 @@ type Driver struct {
 //go:embed icon.svg
 var logo string
 
-func (d *Driver) ThunderSourceDriver() thunder.SourceDriverInfo {
+func (d *Driver) DriverInfo() thunder.SourceDriverInfo {
 	return thunder.SourceDriverInfo{
 		ID: "postgresql_flash",
 		New: func(config any) (thunder.SourceDriver, error) {
@@ -90,8 +90,9 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 	return &stats, nil
 }
 
+// TODO GET CHAN AS ARGS AND RETURN ERROR
 func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, limit uint64) (<-chan *thunder.Document, <-chan error) {
-	query, err := GetSqlForMapping(processor.Table, &processor.Mapping)
+	query, err := GetSqlForProcessor(processor)
 	if err != nil {
 		panic(err)
 	}

@@ -17,6 +17,24 @@ services:
       - "-c"
       - "wal_level=logical"
 
+  elasticsearch:
+    restart: always
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.1
+    ports:
+      - "9200:9200"
+    environment:
+      cluster.name: docker-cluster
+      discovery.type: single-node
+      xpack.security.enabled: false
+      ES_JAVA_OPTS: "-Xms2048m -Xmx8192m"
+
+    healthcheck:
+      test: [ "CMD-SHELL","curl http://localhost:9200" ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin

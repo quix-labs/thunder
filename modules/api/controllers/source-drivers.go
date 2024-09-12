@@ -8,8 +8,6 @@ import (
 	"github.com/quix-labs/thunder/modules/http_server"
 	"log"
 	"net/http"
-	"reflect"
-	"strings"
 )
 
 func SourceDriverRoutes(mux *http.ServeMux) {
@@ -76,15 +74,6 @@ func testSourceDriver(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf(`{"success":true,"message":"%s"}`, message)))
 }
 
-type FieldDetails struct {
-	Name     string  `json:"name"`
-	Label    string  `json:"label"`
-	Type     string  `json:"type"`
-	Required bool    `json:"required"`
-	Help     *string `json:"help,omitempty"`
-	Default  *string `json:"default,omitempty"`
-}
-
 type DriverDetails struct {
 	Config *thunder.SourceDriverInfo `json:"config"`
 	Fields []FieldDetails            `json:"fields"`
@@ -99,7 +88,7 @@ func listSourceDrivers(w http.ResponseWriter, r *http.Request) {
 	for _, driver := range registeredDrivers {
 		res[driver.ID] = &DriverDetails{
 			Config: &driver,
-			Fields: parseSourceDriverFields(&driver),
+			Fields: parseConfigFields(driver.Config),
 		}
 	}
 
@@ -111,59 +100,4 @@ func listSourceDrivers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(jsonData)
-}
-
-func parseSourceDriverFields(driver *thunder.SourceDriverInfo) []FieldDetails {
-
-	var fields []FieldDetails
-	configValue := reflect.ValueOf(driver.Config)
-	configType := reflect.TypeOf(driver.Config)
-
-	if configType.Kind() == reflect.Ptr {
-		configValue = configValue.Elem()
-		configType = configType.Elem()
-	}
-
-	for i := 0; i < configType.NumField(); i++ {
-		field := configType.Field(i)
-
-		label := field.Tag.Get("label")
-		inputType := field.Tag.Get("type")
-		helpTag := field.Tag.Get("help")
-		defaultTag := field.Tag.Get("default")
-		requiredTag := field.Tag.Get("required")
-
-		if label == "" {
-			label = field.Name
-		}
-		if inputType == "" {
-			inputType = "text"
-		}
-		var helpText *string = nil
-		if helpTag != "" {
-			helpText = &helpTag
-		}
-
-		var defaultValue *string = nil
-		if defaultTag != "" {
-			defaultValue = &defaultTag
-		}
-
-		inputName := field.Name
-
-		jsonTag := field.Tag.Get("json")
-		if jsonTag != "" {
-			inputName = strings.Split(jsonTag, ",")[0]
-		}
-
-		fields = append(fields, FieldDetails{
-			Name:     inputName,
-			Label:    label,
-			Type:     inputType,
-			Help:     helpText,
-			Required: requiredTag == "true",
-			Default:  defaultValue,
-		})
-	}
-	return fields
 }

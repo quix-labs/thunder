@@ -23,26 +23,10 @@ func ProcessorRoutes(mux *http.ServeMux) {
 }
 
 func listProcessors(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if len(thunder.GetConfig().Processors) == 0 {
-		w.Write([]byte("[]"))
-		return
-	}
-
-	b, err := json.Marshal(thunder.GetConfig().Processors)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
-		return
-	}
-
-	w.Write(b)
+	writeJsonResponse(w, http.StatusOK, thunder.GetConfig().Processors)
 }
 
 func testProcessor(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	var p thunder.Processor
 
 	err := http_server.DecodeJSONBody(w, r, &p)
@@ -58,24 +42,26 @@ func testProcessor(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if (p.Source + 1) > len(thunder.GetConfig().Sources) {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"Invalid source"}`)))
+		writeJsonError(w, http.StatusBadRequest, errors.New("invalid source"), "")
 		return
 	}
-
+	for _, targetId := range p.Targets {
+		if (targetId + 1) > len(thunder.GetConfig().Targets) {
+			writeJsonError(w, http.StatusBadRequest, errors.New(fmt.Sprintf("invalid target %d", targetId)), "")
+			return
+		}
+	}
 	// Get related
 	source := thunder.GetConfig().Sources[p.Source]
 	driverInfo, err := thunder.GetSourceDriver(source.Driver)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
 	driver, err := driverInfo.New(source.Config)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 	defer driver.Shutdown()
@@ -84,25 +70,26 @@ func testProcessor(w http.ResponseWriter, r *http.Request) {
 	docChan, errChan := driver.GetDocumentsForProcessor(&p, 1)
 	select {
 	case doc, open := <-docChan:
-		w.WriteHeader(http.StatusOK)
-		if open {
-			_, err := w.Write(doc.Json)
-			if err != nil {
-				panic(err)
-			}
+		if !open {
+			writeJsonResponse(w, http.StatusOK, nil)
+			return
 		}
+
+		keyBytes, err := json.Marshal(doc.PrimaryKeys)
+		if err != nil {
+			writeJsonError(w, http.StatusInternalServerError, err, "")
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(fmt.Sprintf(`{"primary_keys":%s,"document":%s}`, keyBytes, doc.Json)))
 		return
 	case err := <-errChan:
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	case <-time.After(time.Second * 5):
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s","message":"Timeout"}`, err)))
+		writeJsonError(w, http.StatusInternalServerError, err, "timeout reached")
 		return
 	}
-	w.Write([]byte("null"))
-
 }
 
 func createProcessor(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +114,12 @@ func createProcessor(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"Invalid source"}`)))
 		return
 	}
-
+	for _, targetId := range p.Targets {
+		if (targetId + 1) > len(thunder.GetConfig().Targets) {
+			writeJsonError(w, http.StatusBadRequest, errors.New(fmt.Sprintf("invalid target %d", targetId)), "")
+			return
+		}
+	}
 	config := thunder.GetConfig()
 	config.Processors = append(config.Processors, p)
 	thunder.SetConfig(config)
@@ -172,6 +164,13 @@ func updateProcessor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for _, targetId := range p.Targets {
+		if (targetId + 1) > len(thunder.GetConfig().Targets) {
+			writeJsonError(w, http.StatusBadRequest, errors.New(fmt.Sprintf("invalid target %d", targetId)), "")
+			return
+		}
+	}
+
 	config := thunder.GetConfig()
 	config.Processors[id] = p
 	thunder.SetConfig(config)
@@ -183,7 +182,7 @@ func updateProcessor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Write([]byte(fmt.Sprintf(`{"success":true,"message":"Source %d updated!"}`, id)))
+	w.Write([]byte(fmt.Sprintf(`{"success":true,"message":"Processor %d updated!"}`, id)))
 }
 
 func deleteProcessor(w http.ResponseWriter, r *http.Request) {
@@ -206,5 +205,5 @@ func deleteProcessor(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
 		return
 	}
-	w.Write([]byte(fmt.Sprintf(`{"success":true,"message":"Source %d deleted!"}`, id)))
+	w.Write([]byte(fmt.Sprintf(`{"success":true,"message":"Processor %d deleted!"}`, id)))
 }

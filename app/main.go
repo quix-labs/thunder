@@ -6,6 +6,7 @@ import (
 	_ "github.com/quix-labs/thunder/modules/frontend"
 	_ "github.com/quix-labs/thunder/modules/http_server"
 	_ "github.com/quix-labs/thunder/source-drivers/postgresql_flash"
+	_ "github.com/quix-labs/thunder/target-drivers/elastic"
 )
 
 func main() {

@@ -27,6 +27,8 @@ func (m *Module) HandleRoutes(mux *http.ServeMux) {
 	controllers.SourceRoutes(mux)
 	controllers.SourceDriverRoutes(mux)
 	controllers.ProcessorRoutes(mux)
+	controllers.TargetDriverRoutes(mux)
+	controllers.TargetRoutes(mux)
 }
 
 func (m *Module) Start() error {

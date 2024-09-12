@@ -13,9 +13,15 @@ type Source struct {
 	Config any    `json:"config"`
 }
 
+type Target struct {
+	Driver string `json:"driver"`
+	Config any    `json:"config"`
+}
+
 type Config struct {
 	Sources    []Source    `json:"sources"`
 	Processors []Processor `json:"processors"`
+	Targets    []Target    `json:"targets"`
 }
 
 var (
@@ -55,11 +61,19 @@ func LoadConfig() error {
 		return err
 	}
 
-	// Parse driver config
+	// Parse source config
 	for idx, source := range config.Sources {
 		if driver, err := GetSourceDriver(source.Driver); err == nil {
 			if typedConfig, err := ConvertSourceDriverConfig(&driver, source.Config); err == nil {
 				config.Sources[idx].Config = typedConfig
+			}
+		}
+	}
+	// Parse target config
+	for idx, target := range config.Targets {
+		if driver, err := GetTargetDriver(target.Driver); err == nil {
+			if typedConfig, err := ConvertTargetDriverConfig(&driver, target.Config); err == nil {
+				config.Targets[idx].Config = typedConfig
 			}
 		}
 	}

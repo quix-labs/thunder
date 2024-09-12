@@ -2,6 +2,7 @@ package postgresql_flash
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -9,6 +10,7 @@ import (
 	"github.com/quix-labs/thunder"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -22,30 +24,35 @@ func generateAlias() string {
 	rand.Seed(time.Now().UnixNano())
 	return "t" + strconv.Itoa(rand.Intn(10000)) // Exemple : t1234
 }
-func GetSqlForMapping(table string, mapping *thunder.Mapping) (string, error) {
-	// Création de la requête principale
-	query := goqu.Dialect("postgres").From(goqu.T(table).As(table))
+func GetSqlForProcessor(processor *thunder.Processor) (string, error) {
+	query := goqu.Dialect("postgres").From(goqu.T(processor.Table))
 
 	var mappingJoins joins
-	resultExpr, err := processMapping(table, mapping, &mappingJoins, false)
+	resultExpr, err := processMapping(processor.Table, &processor.Mapping, &mappingJoins, false)
 	if err != nil {
 		return "", err
 	}
 
-	//TODO PRIMARY KEY CONFIGURABLE
-
-	// Sélection du résultat JSON
-	query = query.Select(
-		resultExpr.As("Json"),
-		goqu.I(table+".id").As("Key"),
-	)
-
-	// Ajout des jointures dans la requête
+	// Append mapping join, selects
+	query = query.Select(resultExpr.As("Json"))
 	for _, join := range mappingJoins {
 		query = query.LeftOuterJoin(join.Table, join.On)
 	}
 
-	// Génération de la requête SQL finale
+	// Append primary keys
+	if len(processor.PrimaryKeys) == 0 {
+		return "", errors.New("primary keys must be set to fetch documents")
+	}
+	var args []any
+	var bindings []string
+	for _, primaryColumn := range processor.PrimaryKeys {
+		args = append(args, goqu.I(processor.Table+"."+primaryColumn))
+		bindings = append(bindings, "?")
+	}
+	query = query.SelectAppend(
+		goqu.L(fmt.Sprintf("ARRAY[%s]::text[]", strings.Join(bindings, ",")), args...).As("PrimaryKeys"),
+	)
+
 	sql, _, _ := query.ToSQL()
 	return sql, nil
 }

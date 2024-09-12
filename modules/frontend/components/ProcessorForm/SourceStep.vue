@@ -45,6 +45,21 @@
         <template #empty>No tables available for the selected source.</template>
       </USelectMenu>
     </UFormGroup>
+
+    <UFormGroup label="Primary keys" required name="primaryKeys" v-if="availableTables">
+      <USelectMenu
+          searchable
+          multiple
+          v-model="form.primary_keys"
+          :options="[...new Set([...availableTables?.[form.table]?.columns || [],...form.primary_keys||[]])]"
+      >
+        <template #label>
+          <span v-if="form.primary_keys?.length>0" class="truncate">{{ form.primary_keys.join(', ') }}</span>
+          <span v-else>Select primary keys</span>
+        </template>
+        <template #empty>No columns available for the selected table.</template>
+      </USelectMenu>
+    </UFormGroup>
     <CreateSourceDriverForm v-model:opened="createSourceOpened" @created="refresh"/>
   </section>
 
@@ -59,8 +74,7 @@ type Stats = { [key: string]: { columns: string[], primary_keys: string[] } };
 const availableTables = ref<Stats>({});
 
 
-
-const computeAvailableTables = async ()=>{
+const computeAvailableTables = async () => {
   if (form.value.source === null) return;
 
   const {data, status, error} = await useGoFetch<Stats>(`/sources/${form.value.source}/stats`);

@@ -119,6 +119,22 @@
               </div>
             </UFormGroup>
 
+            <UFormGroup label="Primary keys" required name="primaryKeys" v-if="mapped.table">
+              <USelectMenu
+                  searchable multiple
+                  v-model="mapped.primary_keys"
+                  :options="[...new Set([...(stats?.[mapped.table]?.columns || []),...(mapped.primary_keys||[])])]"
+              >
+                <template #label>
+                      <span v-if="mapped.primary_keys?.length>0" class="truncate">
+                        {{ mapped.primary_keys.join(', ') }}
+                      </span>
+                  <span v-else>Select primary keys</span>
+                </template>
+                <template #empty>No columns available for the selected table.</template>
+              </USelectMenu>
+            </UFormGroup>
+
           </div>
 
           <template #footer v-if="mapped.table">

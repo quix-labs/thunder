@@ -11,7 +11,7 @@ export default function useProcessFormState() {
         activeTabs: 'source',
         preventScroll: false,
         shortMode: false,
-        liveReload: false,
+        liveReload: true,
         showSamplePanel: true
     }))
 }

@@ -25,12 +25,17 @@
         <UIcon name="i-heroicons-arrow-path" class="animate-spin"/>
       </div>
 
-      <VueJsonPretty
-          v-else-if="status=='success'"
-          show-icon
-          show-length
-          show-line-number
-          :data="data" :theme="useColorMode().value"/>
+      <div v-else-if="status==='success'">
+        <p class="mx-4 mb-4 ">
+          <span class="font-semibold">Document primary keys:</span>
+          [{{ data?.primary_keys?.join(', ') }}]
+        </p>
+        <VueJsonPretty
+            show-icon
+            show-length
+            show-line-number
+            :data="data.document" :theme="useColorMode().value"/>
+      </div>
 
       <div v-else-if="status==='error'" class=" text-red-600 flex flex-col gap-y-2 items-center ">
         <p class="font-semibold  w-full">{{ error?.data?.error }}</p>
@@ -66,7 +71,7 @@ import 'vue-json-pretty/lib/styles.css';
 
 const state = useProcessFormState()
 const form = defineModel<any>('form', {required: true})
-const {status, error, data, refresh} = await useGoFetch("/processors/test", {
+const {status, error, data, refresh} = await useGoFetch<any>("/processors/test", {
   method: 'post',
   body: form,
   watch: false,

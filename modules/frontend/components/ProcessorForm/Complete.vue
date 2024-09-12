@@ -74,6 +74,9 @@ const {mode = "create", processor, processorId} = defineProps<Props>()
 const defaultForm = reactive({
   source: null as number | null,
   table: null as string | null,
+  primary_keys: [] as string[] | null,
+
+  targets: [] as string[],
   index: null as string | null,
   mapping: [] as string[]
 })
@@ -109,7 +112,7 @@ const submit = async () => {
     }
 
     if (status.value === 'error') {
-      useToast().add({title: 'Error', description: error.value?.message, color: 'red'})
+      useToast().add({title: 'Error', description: error?.value?.data?.error || error.value?.message, color: 'red'})
     }
   }
 }
