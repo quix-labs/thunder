@@ -4,13 +4,13 @@
       <UCard class="flex flex-col flex-1" :ui="{body: { base: 'flex-1' },rounded:''}">
         <template #header>
           <h2 class="text-center text-2xl font-semibold">
-            {{ {create: `New target`, edit: `Edit target n°${targetId}`, read: `Target n° ${targetId}`}[mode] }}
+            {{ {create: `New source`, edit: `Edit source n°${sourceId}`, read: `Source n° ${sourceId}`}[mode] }}
           </h2>
         </template>
         <fieldset :disabled="mode==='read'" class="grid gap-y-4">
           <FormCardsInput
               name="driver" label="Driver" required
-              :options="Object.values(targetDrivers || {}).map((item)=>({value:item.config.ID,item}))"
+              :options="Object.values(sourceDrivers || {}).map((item)=>({value:item.config.ID,item}))"
               v-model="form.driver">
             <template #default="{item}">
               <span v-html="item.config.image" v-if="item.config.image" class="nested-svg"/>
@@ -18,20 +18,20 @@
             </template>
           </FormCardsInput>
 
-          <template v-if="targetDrivers && form.driver">
+          <template v-if="sourceDrivers && form.driver">
             <!-- Driver notes-->
-            <div v-if="(targetDrivers?.[form.driver]?.config?.notes?.length || 0) >0">
+            <div v-if="(sourceDrivers?.[form.driver]?.config?.notes?.length || 0) >0">
               <UDivider label="Driver Notes"/>
               <ul class="list-disc list-outside ml-4">
-                <li v-for="note in targetDrivers[form.driver].config.notes" v-text="note"/>
+                <li v-for="note in sourceDrivers[form.driver].config.notes" v-text="note"/>
               </ul>
             </div>
             <UDivider label="Driver Configuration"/>
             <LazyFormDynamicFields
                 v-model="form.config"
                 v-model:schema="configSchema"
-                :fields="targetDrivers[form.driver].fields"
-                v-if="targetDrivers && form.driver"/>
+                :fields="sourceDrivers[form.driver].fields"
+                v-if="sourceDrivers && form.driver"/>
           </template>
         </fieldset>
         <template #footer>
@@ -53,30 +53,30 @@ import {z, type ZodObject, type ZodRawShape} from "zod";
 
 interface Props {
   mode: "create" | "edit" | "read"
-  target?: any
-  targetId?: number
+  source?: any
+  sourceId?: number
 }
 
-const {mode = "create", target, targetId} = defineProps<Props>()
+const {mode = "create", source, sourceId} = defineProps<Props>()
 
 const opened = defineModel('opened')
 const $emit = defineEmits(['created', 'updated'])
 const formEl = ref<HTMLFormElement>()
 
-const {data: targetDrivers} = useTargetDrivers()
+const {data: sourceDrivers} = useSourceDrivers()
 
 const defaultForm = reactive({
   driver: null as string | null,
   config: {} as { [key: string]: any } | null,
 })
 
-const form = computed(() => target || defaultForm)
+const form = computed(() => source || defaultForm)
 
 const configSchema = ref<ZodObject<ZodRawShape> | undefined>()
 const schema = computed(() => {
 
   let base = z.object({
-    driver: z.enum(Object.keys(targetDrivers.value || {}), {
+    driver: z.enum(Object.keys(sourceDrivers.value || {}), {
       required_error: "Driver is required",
     }),
   })
@@ -91,7 +91,7 @@ const schema = computed(() => {
 })
 const submit = async () => {
   if (mode === "create") {
-    const {status, error, data} = await useGoFetch("/targets", {method: 'post', body: form, watch: false})
+    const {status, error, data} = await useGoFetch("/sources", {method: 'post', body: form, watch: false})
     if (status.value === 'success') {
       const serverData = data.value as { message?: string }
       useToast().add({title: 'Success', color: 'green', description: serverData.message})
@@ -104,7 +104,7 @@ const submit = async () => {
       useToast().add({title: 'Error', description: error.value?.data?.error || error.value?.message, color: 'red'})
     }
   } else if (mode === "edit") {
-    const {status, error, data} = await useGoFetch(`/targets/${targetId}`, {
+    const {status, error, data} = await useGoFetch(`/sources/${sourceId}`, {
       method: 'put',
       body: form,
       watch: false
@@ -129,7 +129,7 @@ const sendTestRequest = async () => {
     return
   }
 
-  const {status, error, data} = await useGoFetch("/target-drivers/test", {method: 'post', body: form, watch: false})
+  const {status, error, data} = await useGoFetch("/source-drivers/test", {method: 'post', body: form, watch: false})
 
   if (status.value === 'success') {
     const serverData = data.value as { message?: string }

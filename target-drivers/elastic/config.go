@@ -7,7 +7,7 @@ import (
 )
 
 type DriverConfig struct {
-	Endpoint  string `default:"http://localhost:9200"`
+	Endpoint  string `type:"url" required:"true" default:"http://localhost:9200"`
 	Username  string
 	Password  string `type:"password"`
 	BatchSize int    `type:"number" label:"Batch size" default:"100" min:"1" help:"Use 1 to disable batching (not recommended)"`

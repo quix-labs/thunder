@@ -85,7 +85,7 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, limit uint64) (<-chan *thunder.Document, <-chan error) {
 	query, err := GetSqlForProcessor(processor)
 	if err != nil {
-		panic(err)
+		panic(err) // TODO ERR CHAN
 	}
 	if limit > 0 {
 		query = fmt.Sprintf("%s LIMIT %s", query, strconv.FormatUint(limit, 10))

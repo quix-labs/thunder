@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/quix-labs/thunder"
@@ -12,102 +11,34 @@ import (
 )
 
 func SourceRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /go-api/sources", ListSources)
-	mux.HandleFunc("POST /go-api/sources", CreateSource)
-	mux.HandleFunc("DELETE /go-api/sources/{id}", DeleteSource)
-	mux.HandleFunc("GET /go-api/sources/{id}/stats", GetSourceStats)
+	mux.HandleFunc("GET /go-api/sources", listSources)
+	mux.HandleFunc("POST /go-api/sources", createSource)
+	mux.HandleFunc("PUT /go-api/sources/{id}", updateSource)
+	mux.HandleFunc("DELETE /go-api/sources/{id}", deleteSource)
+	mux.HandleFunc("GET /go-api/sources/{id}/stats", getSourceStats)
 }
 
-func GetSourceStats(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"ID is not an integer"}`)))
-		return
-	}
-
-	if (id + 1) > len(thunder.GetConfig().Sources) {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"Invalid source"}`)))
-		return
-	}
-
-	source := thunder.GetConfig().Sources[id]
-
-	driver, err := thunder.GetSourceDriver(source.Driver)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
-		return
-	}
-
-	driverInstance, err := driver.New(source.Config)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		bytes, _ := json.Marshal(struct {
-			Success bool   `json:"success"`
-			Error   string `json:"error"`
-		}{Success: false, Error: err.Error()})
-		w.Write(bytes)
-		return
-	}
-
-	stats, err := driverInstance.Stats()
-	if err != nil {
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		bytes, _ := json.Marshal(struct {
-			Success bool   `json:"success"`
-			Error   string `json:"error"`
-		}{Success: false, Error: err.Error()})
-		w.Write(bytes)
-		return
-	}
-
-	bytes, _ := json.Marshal(stats)
-	w.Write(bytes)
-
+type SourceApiDetails struct {
+	Driver  string `json:"driver"`
+	Config  any    `json:"config"`
+	Excerpt string `json:"excerpt"`
 }
 
-func DeleteSource(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+func listSources(w http.ResponseWriter, r *http.Request) {
+	sources := thunder.GetConfig().Sources
+	var res = make(map[int]SourceApiDetails, len(sources))
 
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"ID is not an integer"}`)))
-		return
+	for key, source := range sources {
+		res[key] = SourceApiDetails{
+			Driver:  source.Driver,
+			Config:  source.Config,
+			Excerpt: source.Config.Excerpt(),
+		}
 	}
-
-	config := thunder.GetConfig()
-	config.Sources = append(config.Sources[:id], config.Sources[id+1:]...)
-	thunder.SetConfig(config)
-
-	err = thunder.SaveConfig()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
-		return
-	}
-	w.Write([]byte(fmt.Sprintf(`{"success":true,"message":"Source %d deleted!"}`, id)))
-
+	writeJsonResponse(w, http.StatusOK, res)
 }
 
-func ListSources(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	b, err := json.Marshal(thunder.GetConfig().Sources)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
-		return
-	}
-
-	w.Write(b)
-}
-func CreateSource(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
+func createSource(w http.ResponseWriter, r *http.Request) {
 	var p struct {
 		Driver string `json:"driver"`
 		Config any    `json:"config"`
@@ -126,15 +57,13 @@ func CreateSource(w http.ResponseWriter, r *http.Request) {
 
 	driver, err := thunder.GetSourceDriver(p.Driver)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
 	configInstance, err := thunder.ConvertToDynamicConfig(&driver.Config, p.Config)
 	if err != nil {
-		panic(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
@@ -144,10 +73,127 @@ func CreateSource(w http.ResponseWriter, r *http.Request) {
 
 	err = thunder.SaveConfig()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+	writeJsonResponse(w, http.StatusOK, struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{true, "Source created"})
+}
+
+func updateSource(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
 		return
 	}
 
-	w.Write([]byte(`{"success":true,"message":"Source created"}`))
+	var p struct {
+		Driver string `json:"driver"`
+		Config any    `json:"config"`
+	}
+	err = http_server.DecodeJSONBody(w, r, &p)
+	if err != nil {
+		var mr *http_server.MalformedRequest
+		if errors.As(err, &mr) {
+			http.Error(w, mr.Msg, mr.Status)
+		} else {
+			log.Print(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	driver, err := thunder.GetSourceDriver(p.Driver)
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, err, "")
+		return
+	}
+
+	configInstance, err := thunder.ConvertToDynamicConfig(&driver.Config, p.Config)
+	if err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+
+	if (id + 1) > len(thunder.GetConfig().Sources) {
+		writeJsonError(w, http.StatusBadRequest, errors.New("invalid source"), "")
+		return
+	}
+
+	config := thunder.GetConfig()
+	config.Sources[id] = thunder.Source{Driver: p.Driver, Config: configInstance}
+	thunder.SetConfig(config)
+
+	err = thunder.SaveConfig()
+	if err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+	writeJsonResponse(w, http.StatusOK, struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{true, fmt.Sprintf("Source %d updated", id)})
+}
+
+func deleteSource(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
+		return
+	}
+
+	if (id + 1) > len(thunder.GetConfig().Sources) {
+		writeJsonError(w, http.StatusBadRequest, errors.New("invalid source"), "")
+		return
+	}
+
+	config := thunder.GetConfig()
+	config.Sources = append(config.Sources[:id], config.Sources[id+1:]...)
+	thunder.SetConfig(config)
+
+	err = thunder.SaveConfig()
+	if err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+
+	writeJsonResponse(w, http.StatusOK, struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{true, fmt.Sprintf(`Source %d deleted!`, id)})
+}
+
+func getSourceStats(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
+		return
+	}
+
+	if (id + 1) > len(thunder.GetConfig().Sources) {
+		writeJsonError(w, http.StatusBadRequest, errors.New("invalid source"), "")
+		return
+	}
+
+	source := thunder.GetConfig().Sources[id]
+	driver, err := thunder.GetSourceDriver(source.Driver)
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, err, "")
+		return
+	}
+
+	driverInstance, err := driver.New(source.Config)
+	if err != nil {
+		writeJsonError(w, http.StatusUnprocessableEntity, err, "")
+		return
+	}
+
+	stats, err := driverInstance.Stats()
+	if err != nil {
+		writeJsonError(w, http.StatusUnprocessableEntity, err, "")
+		return
+	}
+	writeJsonResponse(w, http.StatusOK, stats)
 }

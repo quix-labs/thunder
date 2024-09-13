@@ -1,41 +1,102 @@
 <template>
-  <section>
-    <UCard>
+  <section class="flex flex-col flex-1">
+    <UCard class="w-full" :ui="{
+      divide: 'divide-y divide-gray-200 dark:divide-gray-700',
+      body: { padding: '' },
+      header:{base:'flex gap-x-2 justify-between items-center'},
+      footer:{base:'text-sm leading-5 text-center'}
+    }">
       <template #header>
-        <div class="flex gap-x-2 items-center justify-between">
-          <h1>Data Sources</h1>
-          <UButton @click.prevent="createSlideoverOpen=!createSlideoverOpen" variant="soft">+ Add Source</UButton>
-        </div>
+        <h1 class="font-semibold text-xl text-gray-900 dark:text-white leading-tight">Sources</h1>
+        <UButton @click.prevent="create" variant="soft">+ Add Source</UButton>
       </template>
       <template #default>
-        <div class="grid grid-cols-3">
-          <div v-for="(source,index) in sources||[]">
-
-          <span v-if="sourceDrivers && sourceDrivers[source.driver]?.config?.image"
-                v-html="sourceDrivers[source.driver]?.config?.image" class="nested-svg"/>
-            Source n°{{ index }} (TODO user defined name)
-
-            <UButton color="red" icon="i-heroicons-trash" @click.prevent="deleteSource(index)">
-              Delete
-            </UButton>
-
-          </div>
-        </div>
-
+        <UTable @select="(row:any)=>show(row.id)" :columns="columns" :rows="rows"
+                :sort="{column:'id',direction:'desc'}"
+                :loading="status==='pending' || status==='idle'">
+          <template #driver-data="{ row }">
+            <UBadge size="xs" :label="row.driver" color="sky" variant="subtle"/>
+          </template>
+          <template #actions-data="{ row }">
+            <div class="flex gap-1">
+              <UDropdown :items="[[{label:'Replicate',click:()=>clone(row.id)}]]" @click.stop>
+                <UButton icon="i-heroicons-ellipsis-horizontal" variant="link" color="gray" size="xl" :padded="false"/>
+              </UDropdown>
+              <UButton icon="i-heroicons-eye" variant="link" color="gray" size="xl" :padded="false"
+                       @click.stop.prevent="show(row.id)"/>
+              <UButton icon="i-heroicons-pencil-square" variant="link" color="gray" size="xl" :padded="false"
+                       @click.stop.prevent="edit(row.id)"/>
+              <UButton icon="i-heroicons-trash" variant="link" color="red" size="xl" :padded="false"
+                       @click.stop.prevent="remove(row.id)"/>
+            </div>
+          </template>
+        </UTable>
+      </template>
+      <template #footer>
+        <span class="font-medium">Total:&nbsp;</span>
+        <span>{{ rows?.length || 0 }}&nbsp;sources</span>
       </template>
     </UCard>
-    <CreateSourceDriverForm v-model:opened="createSlideoverOpen" @created="refresh"/>
+    <SourceForm
+        @updated="refresh"
+        @created="refresh"
+        :mode="formMode"
+        v-model:opened="formOpened"
+        :source="formSource"
+        :source-id="formSourceId"
+    />
   </section>
-
-
 </template>
+
 <script setup lang="ts">
+const {status, data: sources, refresh} = useSources()
 
-const createSlideoverOpen = ref(false)
-const {data: sources, refresh} = useSources()
-const {data: sourceDrivers} = useSourceDrivers()
+const columns = [
+  {key: 'id', label: '#', sortable: true, rowClass: 'w-[1px] whitespace-nowrap'},
+  {key: 'excerpt', label: 'Excerpt', sortable: true},
+  {key: 'driver', label: 'Driver', sortable: true},
+  {key: 'actions', sortable: false, rowClass: 'w-[1px] whitespace-nowrap'}
+]
 
-const deleteSource = async (id: number) => {
+const rows = computed(() => Object.entries(sources.value || {})?.map(([key, source]) => ({
+  id: parseFloat(key),
+  excerpt: source.excerpt,
+  driver: source.driver,
+})) || [])
+
+
+// Form
+const formOpened = ref(false);
+const formMode = ref<"create" | "edit" | "read">("create");
+const formSource = ref<any>();
+const formSourceId = ref<number>();
+
+
+const create = () => {
+  formMode.value = "create"
+  formSource.value = undefined
+  formSourceId.value = undefined
+  formOpened.value = true
+}
+const show = (id: number) => {
+  formMode.value = "read"
+  formSource.value = sources.value?.[id]
+  formSourceId.value = id
+  formOpened.value = true
+}
+const edit = (id: number) => {
+  formMode.value = "edit"
+  formSource.value = sources.value?.[id]
+  formSourceId.value = id
+  formOpened.value = true
+}
+const clone = (id: number) => {
+  formMode.value = "create"
+  formSource.value = {...sources.value?.[id]}
+  formSourceId.value = undefined
+  formOpened.value = true
+}
+const remove = async (id: number) => {
   const {data, error, status} = await useGoFetch(`/sources/${id}`, {method: "DELETE"})
   if (status.value === "error") {
     useToast().add({color: "red", title: "Unable to delete source", description: error.value?.message})
@@ -46,15 +107,3 @@ const deleteSource = async (id: number) => {
   await refresh()
 }
 </script>
-
-<style scoped>
-.nested-svg {
-  display: block;
-  height: 3em;
-}
-
-.nested-svg :global(svg) {
-  width: 100%;
-  height: 100%;
-}
-</style>

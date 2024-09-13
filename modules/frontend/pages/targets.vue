@@ -49,8 +49,6 @@
 </template>
 
 <script setup lang="ts">
-import useTargets from "~/composables/useTargets";
-
 const {status, data: targets, refresh} = useTargets()
 
 const columns = [

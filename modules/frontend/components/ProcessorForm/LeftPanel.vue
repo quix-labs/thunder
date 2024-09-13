@@ -1,6 +1,5 @@
 <template>
   <div class="flex flex-col flex-1 gap-y-4 max-h-screen overflow-auto p-4">
-
     <!-- SOURCE -->
     <UCard
         tabindex="0"
@@ -59,8 +58,13 @@
           Describe how your data will be synchronized
         </p>
       </template>
-      <p>Targets: "TODO Implement target and target drivers"[]</p>
-      <p>Index: {{ form.index }}</p>
+      <p class="font-semibold">
+        Targets: <span class="font-normal">{{form.targets?.map(i=>`Target n°${i}`)?.join(', ')}}</span>
+      </p>
+      <p class="font-semibold">
+        Expected index: <span class="font-normal">{{ form.index }}</span>
+      </p>
+
     </UCard>
 
 

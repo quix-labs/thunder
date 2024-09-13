@@ -1,5 +1,6 @@
 export type TargetDriver = {
     config: {
+        ID: string,
         name: string
         image?: string
         notes?: string[]

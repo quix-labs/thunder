@@ -2,23 +2,24 @@
   <section>
     <UFormGroup label="Source" required name="source">
       <div class="grid grid-cols-2 gap-4">
-        <div v-for="(source, key) in sources" :key="key">
+        <div v-for="([key,source]) in Object.entries(sources||{})" :key="key">
           <input
               type="radio"
               name="source"
               v-model="form.source"
-              :value="key"
+              :value="parseFloat(key)"
               class="sr-only peer"
               :id="`source-${key}`"
               tabindex="-1"
           />
           <label
               tabindex="0"
-              @keydown.enter.space.prevent="form.driver=key"
+              @keydown.enter.space.prevent="form.driver=parseFloat(key)"
               :for="`source-${key}`"
               class="cursor-pointer flex flex-col gap-y-2 items-center rounded-lg p-4 text-gray-900 dark:text-white bg-white dark:bg-gray-900 ring-1 ring-gray-200 dark:ring-gray-800 peer-checked:ring-2 peer-checked:ring-primary-500"
           >
-            Source n°{{ key }} (TODO user defined name)
+            <p class="font-semibold">Source n°{{ key }}</p>
+            <span class="italic text-gray-400" v-if="source.excerpt">{{source.excerpt}}</span>
           </label>
         </div>
 
@@ -60,10 +61,8 @@
         <template #empty>No columns available for the selected table.</template>
       </USelectMenu>
     </UFormGroup>
-    <CreateSourceDriverForm v-model:opened="createSourceOpened" @created="refresh"/>
+    <SourceForm v-model:opened="createSourceOpened" @created="refresh" mode="create"/>
   </section>
-
-
 </template>
 <script setup lang="ts">
 

@@ -1,6 +1,10 @@
 package postgresql_flash
 
-import "github.com/quix-labs/thunder"
+import (
+	"fmt"
+	"github.com/quix-labs/thunder"
+	"strings"
+)
 
 type DriverConfig struct {
 	Host     string `default:"localhost"`
@@ -12,7 +16,9 @@ type DriverConfig struct {
 }
 
 func (cfg DriverConfig) Excerpt() string {
-	return ""
+	var cnx string
+	cnx = fmt.Sprintf("%s:%s@%s:%d/%s (schema:%s)", cfg.User, strings.Repeat("*", 12), cfg.Host, cfg.Port, cfg.Database, cfg.Schema)
+	return cnx
 }
 
 var (
