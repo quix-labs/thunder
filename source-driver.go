@@ -13,8 +13,9 @@ type SourceDriverInfo struct {
 	ID  string                                 `json:"ID"`
 	New func(config any) (SourceDriver, error) `json:"-"`
 
-	Name   string `json:"name"`
-	Config any    `json:"-"`
+	Name   string        `json:"name"`
+	Config DynamicConfig `json:"-"`
+
 	// As inlined SVG
 	Image string   `json:"image,omitempty"`
 	Notes []string `json:"notes,omitempty"`

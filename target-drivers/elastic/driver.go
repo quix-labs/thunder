@@ -13,17 +13,8 @@ func init() {
 	thunder.RegisterTargetDriver(&Driver{})
 }
 
-type DriverConfig struct {
-	Endpoint  string `default:"http://localhost:9200"`
-	Username  string
-	Password  string `type:"password"`
-	BatchSize int    `type:"number" label:"Batch size" default:"100" min:"1" help:"Use 1 to disable batching (not recommended)"`
-	Prefix    string
-}
-
 type Driver struct {
 	config *DriverConfig
-
 	client *elasticsearch.TypedClient
 }
 
@@ -68,3 +59,7 @@ func NewConn(cfg *DriverConfig) (*elasticsearch.TypedClient, error) {
 	esConfig.Password = cfg.Password
 	return elasticsearch.NewTypedClient(esConfig)
 }
+
+var (
+	_ thunder.TargetDriver = (*Driver)(nil)
+)

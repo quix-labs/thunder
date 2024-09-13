@@ -31,7 +31,6 @@ func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}) err
 	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 
 	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
 
 	err := dec.Decode(&dst)
 	if err != nil {

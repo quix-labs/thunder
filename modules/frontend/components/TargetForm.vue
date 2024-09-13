@@ -93,23 +93,22 @@ const submit = async () => {
       useToast().add({title: 'Error', description: error.value?.data?.error || error.value?.message, color: 'red'})
     }
   } else if (mode === "edit") {
-    //TODO
-    // const {status, error, data} = await useGoFetch(`/processors/${processorId}`, {
-    //   method: 'put',
-    //   body: form,
-    //   watch: false
-    // })
-    // if (status.value === 'success') {
-    //   const serverData = data.value as { message?: string }
-    //   useToast().add({title: 'Success', color: 'green', description: serverData.message})
-    //   $emit('updated')
-    //   opened.value = false
-    //   return
-    // }
-    //
-    // if (status.value === 'error') {
-    //   useToast().add({title: 'Error', description: error.value?.message, color: 'red'})
-    // }
+    const {status, error, data} = await useGoFetch(`/targets/${targetId}`, {
+      method: 'put',
+      body: form,
+      watch: false
+    })
+    if (status.value === 'success') {
+      const serverData = data.value as { message?: string }
+      useToast().add({title: 'Success', color: 'green', description: serverData.message})
+      $emit('updated')
+      opened.value = false
+      return
+    }
+
+    if (status.value === 'error') {
+      useToast().add({title: 'Error', description: error.value?.message, color: 'red'})
+    }
   }
 
 }

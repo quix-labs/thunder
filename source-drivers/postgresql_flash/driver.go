@@ -15,15 +15,6 @@ func init() {
 	thunder.RegisterSourceDriver(&Driver{})
 }
 
-type DriverConfig struct {
-	Host     string `default:"localhost"`
-	Port     uint16 `type:"number" default:"5432"`
-	User     string `required:"true"`
-	Password string `required:"true" type:"password"`
-	Database string `required:"true"`
-	Schema   string `default:"public"`
-}
-
 type Driver struct {
 	config *DriverConfig
 	conn   *pgx.Conn
@@ -141,5 +132,5 @@ func (d *Driver) newConn(cfg *DriverConfig) (*pgx.Conn, error) {
 }
 
 var (
-	_ thunder.SourceDriver = (*Driver)(nil) // Interface implementation
+	_ thunder.SourceDriver = (*Driver)(nil)
 )

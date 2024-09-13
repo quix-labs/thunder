@@ -9,13 +9,13 @@ import (
 )
 
 type Source struct {
-	Driver string `json:"driver"`
-	Config any    `json:"config"`
+	Driver string        `json:"driver"`
+	Config DynamicConfig `json:"config"`
 }
 
 type Target struct {
-	Driver string `json:"driver"`
-	Config any    `json:"config"`
+	Driver string        `json:"driver"`
+	Config DynamicConfig `json:"config"`
 }
 
 type Config struct {
@@ -57,23 +57,48 @@ func LoadConfig() error {
 
 	configMu.Lock()
 	defer configMu.Unlock()
-	if err = json.Unmarshal(content, &config); err != nil {
+
+	var jsonConfig struct {
+		Sources []struct {
+			Driver string `json:"driver"`
+			Config any    `json:"config"`
+		} `json:"sources"`
+		Processors []Processor `json:"processors"`
+		Targets    []struct {
+			Driver string `json:"driver"`
+			Config any    `json:"config"`
+		} `json:"targets"`
+	}
+
+	if err = json.Unmarshal(content, &jsonConfig); err != nil {
 		return err
 	}
 
 	// Parse source config
-	for idx, source := range config.Sources {
+	config.Sources = make([]Source, len(jsonConfig.Sources))
+	for idx, source := range jsonConfig.Sources {
 		if driver, err := GetSourceDriver(source.Driver); err == nil {
-			if typedConfig, err := ConvertSourceDriverConfig(&driver, source.Config); err == nil {
-				config.Sources[idx].Config = typedConfig
+			if typedConfig, err := ConvertToDynamicConfig(&driver.Config, source.Config); err == nil {
+				config.Sources[idx] = Source{
+					Driver: source.Driver,
+					Config: typedConfig,
+				}
 			}
 		}
 	}
+
+	// Assign processors
+	config.Processors = jsonConfig.Processors
+
 	// Parse target config
-	for idx, target := range config.Targets {
+	config.Targets = make([]Target, len(jsonConfig.Targets))
+	for idx, target := range jsonConfig.Targets {
 		if driver, err := GetTargetDriver(target.Driver); err == nil {
-			if typedConfig, err := ConvertTargetDriverConfig(&driver, target.Config); err == nil {
-				config.Targets[idx].Config = typedConfig
+			if typedConfig, err := ConvertToDynamicConfig(&driver.Config, target.Config); err == nil {
+				config.Targets[idx] = Target{
+					Driver: target.Driver,
+					Config: typedConfig,
+				}
 			}
 		}
 	}

@@ -36,7 +36,7 @@ func testTargetDriver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	configInstance, err := thunder.ConvertTargetDriverConfig(&driver, p.Config)
+	configInstance, err := thunder.ConvertToDynamicConfig(&driver.Config, p.Config)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
@@ -61,8 +61,8 @@ func testTargetDriver(w http.ResponseWriter, r *http.Request) {
 }
 
 type TargetDriverDetails struct {
-	Config *thunder.TargetDriverInfo `json:"config"`
-	Fields []FieldDetails            `json:"fields"`
+	Config *thunder.TargetDriverInfo   `json:"config"`
+	Fields thunder.DynamicConfigFields `json:"fields"`
 }
 
 func listTargetDrivers(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +71,7 @@ func listTargetDrivers(w http.ResponseWriter, r *http.Request) {
 	for _, driver := range registeredDrivers {
 		res[driver.ID] = &TargetDriverDetails{
 			Config: &driver,
-			Fields: parseConfigFields(driver.Config),
+			Fields: thunder.ParseDynamicConfigFields(&driver.Config),
 		}
 	}
 	writeJsonResponse(w, http.StatusOK, res)

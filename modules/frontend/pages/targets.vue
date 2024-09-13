@@ -43,7 +43,7 @@
         :mode="formMode"
         v-model:opened="formOpened"
         :target="formTarget"
-        :processor-id="formTargetId"
+        :target-id="formTargetId"
     />
   </section>
 </template>
@@ -55,14 +55,14 @@ const {status, data: targets, refresh} = useTargets()
 
 const columns = [
   {key: 'id', label: '#', sortable: true, rowClass: 'w-[1px] whitespace-nowrap'},
-  {key: 'name', label: 'Name', sortable: true},
+  {key: 'excerpt', label: 'Excerpt', sortable: true},
   {key: 'driver', label: 'Driver', sortable: true},
   {key: 'actions', sortable: false, rowClass: 'w-[1px] whitespace-nowrap'}
 ]
 
-const rows = computed(() => targets.value?.map((target, key) => ({
-  id: key,
-  name: 'TODO name',
+const rows = computed(() => Object.entries(targets.value || {})?.map(([key, target]) => ({
+  id: parseFloat(key),
+  excerpt: target.excerpt,
   driver: target.driver,
 })) || [])
 
@@ -83,19 +83,19 @@ const create = () => {
 }
 const show = (id: number) => {
   formMode.value = "read"
-  formTarget.value = targets.value?.at(id)
+  formTarget.value = targets.value?.[id]
   formTargetId.value = id
   formOpened.value = true
 }
 const edit = (id: number) => {
   formMode.value = "edit"
-  formTarget.value = targets.value?.at(id)
+  formTarget.value = targets.value?.[id]
   formTargetId.value = id
   formOpened.value = true
 }
 const clone = (id: number) => {
   formMode.value = "create"
-  formTarget.value = {...targets.value?.at(id)}
+  formTarget.value = {...targets.value?.[id]}
   formTargetId.value = undefined
   formOpened.value = true
 }

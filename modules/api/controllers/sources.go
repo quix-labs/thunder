@@ -131,7 +131,7 @@ func CreateSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	configInstance, err := thunder.ConvertSourceDriverConfig(&driver, p.Config)
+	configInstance, err := thunder.ConvertToDynamicConfig(&driver.Config, p.Config)
 	if err != nil {
 		panic(err)
 		w.WriteHeader(http.StatusInternalServerError)
