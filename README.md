@@ -13,6 +13,12 @@ Features and APIs may change.
 
 Contributions and feedback are welcome!
 
+## Features
+
+- **Non-Intrusive Synchronization**: Sync your SQL data without any performance hit to your database.
+- **Real-Time Indexing**: Automatically update indexes in near real-time whenever your data changes.
+- **Scalable**: Designed to handle databases of all sizes, ensuring quick and efficient syncs.
+
 ## Table of Contents
 
 <!-- TOC -->
@@ -32,12 +38,6 @@ Contributions and feedback are welcome!
 * [License](#license)
 
 <!-- TOC -->
-
-## Features
-
-- **Non-Intrusive Synchronization**: Sync your SQL data without any performance hit to your database.
-- **Real-Time Indexing**: Automatically update indexes in near real-time whenever your data changes.
-- **Scalable**: Designed to handle databases of all sizes, ensuring quick and efficient syncs.
 
 ## Installation
 
