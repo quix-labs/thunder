@@ -112,7 +112,7 @@ func (d *Driver) Shutdown() error {
 }
 
 func (d *Driver) newConn() (*pgx.Conn, error) {
-	pgConnConfig, err := pgx.ParseConfig("")
+	pgConnConfig, err := pgx.ParseConfig("postgres://u:s@l:5432/d?sslmode=disable")
 	if err != nil {
 		return nil, err
 	}
@@ -121,8 +121,6 @@ func (d *Driver) newConn() (*pgx.Conn, error) {
 	pgConnConfig.Port = d.config.Port
 	pgConnConfig.Password = d.config.Password
 	pgConnConfig.Database = d.config.Database
-
-	pgConnConfig.RuntimeParams["sslmode"] = "disable"
 
 	pgConn, err := pgx.ConnectConfig(context.Background(), pgConnConfig)
 	if err != nil {
