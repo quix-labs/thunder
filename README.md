@@ -15,12 +15,23 @@ Contributions and feedback are welcome!
 
 ## Table of Contents
 
+<!-- TOC -->
+
+* [Notes](#notes)
 * [Features](#features)
 * [Installation](#installation)
+    * [Using go (build from source)](#using-go-build-from-source)
 * [How to configure](#how-to-configure)
+    * [Sources](#sources)
+    * [Processors](#processors)
+        * [List processors](#list-processors)
+        * [Edit processor](#edit-processor)
+    * [Targets](#targets)
 * [Contributing](#contributing)
 * [Credits](#credits)
 * [License](#license)
+
+<!-- TOC -->
 
 ## Features
 
@@ -30,11 +41,89 @@ Contributions and feedback are welcome!
 
 ## Installation
 
-TODO
+### Using go (build from source)
+
+```bash
+cd /path/your/want
+go mod init thunder
+go get -u github.com/quix-labs/thunder/app@main
+
+touch main.go # Create base app file
+```
+
+Edit `main.go` and put this:
+
+```go
+package main
+
+import (
+	"github.com/quix-labs/thunder"
+	// Remove unnecessary modules/drivers
+	_ "github.com/quix-labs/thunder/modules/api"
+	_ "github.com/quix-labs/thunder/modules/frontend"
+	_ "github.com/quix-labs/thunder/modules/http_server"
+	_ "github.com/quix-labs/thunder/source-drivers/postgresql_flash"
+	_ "github.com/quix-labs/thunder/target-drivers/elastic"
+)
+
+func main() {
+	err := thunder.Start()
+	if err != nil {
+		panic(err)
+	}
+}
+```
+
+Compile your app:
+
+```bash
+go mod tidy #Download add modules/drivers from main.go
+
+# CGO_ENABLED=0 is optional, but better for cross-platform compilation
+# Ignore it if your are building directly on the target
+
+CGO_ENABLED=0 go build -ldflags="-s -w" -o thunder
+```
+
+Start your compiled app:
+
+```bash
+./thunder
+
+# Actually, the config.json file will be placed in the current directory
+
+# You can now access localhost:3000 and configure
+```
 
 ## How to configure
 
-Access [http://localhost:3000](http://localhost:3000)
+### Sources
+
+Sources define your database connections
+
+Go to `/sources` to configure them
+
+### Processors
+
+Processor describe how your structured data will be destructured
+
+Go to `/processors` to configure them
+
+#### List processors
+
+<p align="center"><img src="./img/processors-list.png" alt="Thunder Processors List"></p>
+
+#### Edit processor
+
+* Using the frontend, you can have autocompletion of table and columns
+
+<p align="center"><img src="./img/processor-edit.png" alt="Thunder Processor Edit"></p>
+
+### Targets
+
+Targets define your indexer connections
+
+Go to `/targets` to configure them
 
 ## Contributing
 
