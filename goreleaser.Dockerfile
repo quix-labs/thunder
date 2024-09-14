@@ -1,3 +1,3 @@
-FROM scratch
-COPY thunder /
-ENTRYPOINT ["/thunder"]
+FROM alpine
+COPY thunder /bin
+CMD ["thunder"]
