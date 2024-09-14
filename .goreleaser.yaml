@@ -13,16 +13,18 @@ before:
     - go mod tidy
 
 builds:
-  - id: nonlinux
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - windows
-      - darwin
-    goarch:
-      - amd64
-      - arm64
-    dir: app
+#  - id: nonlinux
+#    env:
+#      - CGO_ENABLED=0
+#    goos:
+#      - windows
+#      - darwin
+#    goarch:
+#      - amd64
+#      - arm64
+#    dir: .
+#    main: ./app
+
 
   - id: linux
     env:
@@ -31,10 +33,11 @@ builds:
       - linux
     goarch:
       - amd64
-      - arm64
-      - arm
-      - "386"
+#      - arm64
+#      - arm
+#      - "386"
     dir: app
+
 
 nfpms:
   - maintainer: Quix Labs <contact@quix-labs.com>
