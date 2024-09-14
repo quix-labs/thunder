@@ -20,6 +20,7 @@
 
       <p>Source: Source n°{{ form.source }}</p>
       <p>Table: {{ form.table || '---' }}</p>
+      <p>Conditions: {{ form.conditions?.length || '---' }} TODO</p>
 
     </UCard>
 

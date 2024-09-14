@@ -52,6 +52,21 @@ func (d *Driver) TestConfig() (string, error) {
 	return fmt.Sprintf(`successfully connected, cluster: "%s"`, res.ClusterName), nil
 }
 
+func (d *Driver) IndexDocumentsForProcessor(processor *thunder.Processor, docChan <-chan *thunder.Document, errChan chan error) {
+	bulkIndexer := NewBulkIndexer(d.client, d.config.BatchSize)
+	for doc := range docChan {
+		bulkIndexer.Add(
+			[]byte(`{"index":{"_index":"`+d.config.Prefix+processor.Index+`","_id":"`+GetPrimaryKeysAsString(doc.PrimaryKeys)+`"}}`),
+			doc.Json,
+		)
+	}
+	bulkIndexer.Close()
+}
+
+func (d *Driver) Shutdown() error {
+	return nil
+}
+
 func NewConn(cfg *DriverConfig) (*elasticsearch.TypedClient, error) {
 	esConfig := elasticsearch.Config{}
 	esConfig.Addresses = []string{cfg.Endpoint}

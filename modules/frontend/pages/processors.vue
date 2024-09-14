@@ -16,7 +16,10 @@
                 :loading="status==='pending' || status==='idle'">
           <template #actions-data="{ row }">
             <div class="flex gap-1">
-              <UDropdown :items="[[{label:'Replicate',click:()=>cloneProcessor(row.id)}]]" @click.stop>
+              <UDropdown :items="[[
+                  {label:'Replicate',click:()=>cloneProcessor(row.id)},
+                  {label:'Claim indexing',click:()=>claimIndexing(row.id),disabled:row.status==='indexing'},
+              ]]" @click.stop>
                 <UButton icon="i-heroicons-ellipsis-horizontal" variant="link" color="gray" size="xl" :padded="false"/>
               </UDropdown>
               <UButton icon="i-heroicons-eye" variant="link" color="gray" size="xl" :padded="false"
@@ -29,7 +32,8 @@
           </template>
           <template #targets-data="{ row }">
             <div class="flex gap-1">
-              <UBadge size="xs" :label="`Target n°${target}`" color="sky" variant="subtle" v-for="target in row.targets"/>
+              <UBadge size="xs" :label="`Target n°${target}`" color="sky" variant="subtle"
+                      v-for="target in row.targets"/>
             </div>
           </template>
           <template #source-data="{ row }">
@@ -41,11 +45,12 @@
             <div class="flex gap-1">
               <UBadge size="xs" :label="`${row.stats.total} fields`" color="gray"/>
               <UBadge size="xs" :label="`${row.stats.relations} relations`" color="gray"/>
+              <UBadge size="xs" :label="`${row.stats.conditions} conditions`" color="gray"/>
             </div>
           </template>
-          <template #state-data="{ row }">
-            <UBadge size="xs" :label="row.state"
-                    :color="{listening:'green',inactive:'red',indexing:'sky'}[row.state] || 'gray'"/>
+          <template #status-data="{ row }">
+            <UBadge size="xs" :label="row.status"
+                    :color="{listening:'green',inactive:'red',indexing:'sky'}[row.status] || 'gray'"/>
           </template>
         </UTable>
       </template>
@@ -61,14 +66,29 @@
         :mode="formMode"
         v-model:opened="formOpened"
         :processor="formProcessor"
-        :processor-id="formProcessorId"
     />
   </section>
 
 </template>
 
 <script setup lang="ts">
+
 const {status, data: processors, refresh} = useProcessors()
+
+
+onMounted(() => {
+  const {on} = useEvents()
+  on('processor-updated', () => {
+    refresh()
+  })
+  on('processor-indexed', (processorId) => {
+    useToast().add({
+      color: "green",
+      title: `Processor ${processorId} indexed`,
+    })
+  })
+})
+
 
 // Table
 const columns = [
@@ -77,17 +97,20 @@ const columns = [
   {key: 'index', label: 'Index', sortable: true},
   {key: 'targets', label: 'Targets', sortable: false},
   {key: 'stats', label: 'Stats', sortable: false},
-  {key: 'state', label: 'State', sortable: false},
+  {key: 'status', label: 'Status', sortable: false},
   {key: 'actions', sortable: false, rowClass: 'w-[1px] whitespace-nowrap'}
 ]
 
-const rows = computed(() => processors.value?.map((processor, key) => ({
-  id: key,
+const rows = computed(() => processors.value?.map(processor => ({
+  id: processor.id,
   targets: processor.targets,
   index: processor.index || '---',
   source: processor.source !== undefined ? processor.source : '---',
-  stats: getMappingStats(processor.mapping || []),
-  state: 'inactive',
+  stats: {
+    conditions: processor.conditions?.length || 0,
+    ...getMappingStats(processor.mapping || [])
+  },
+  status: processor.status || '---',
 })) || [])
 
 const getMappingStats = (mapping: any[]) => {
@@ -109,30 +132,25 @@ const getMappingStats = (mapping: any[]) => {
 const formOpened = ref(false);
 const formMode = ref<"create" | "edit" | "read">("create");
 const formProcessor = ref<any>();
-const formProcessorId = ref<number>();
 
 const createProcessor = async () => {
   formMode.value = "create"
   formProcessor.value = undefined
-  formProcessorId.value = undefined
   formOpened.value = true
 }
 const showProcessor = async (id: number) => {
   formMode.value = "read"
-  formProcessor.value = processors.value?.at(id)
-  formProcessorId.value = id
+  formProcessor.value = processors.value?.filter(p => p.id === id)?.at(0)
   formOpened.value = true
 }
 const editProcessor = async (id: number) => {
   formMode.value = "edit"
-  formProcessor.value = processors.value?.at(id)
-  formProcessorId.value = id
+  formProcessor.value = processors.value?.filter(p => p.id === id)?.at(0)
   formOpened.value = true
 }
 const cloneProcessor = async (id: number) => {
   formMode.value = "create"
-  formProcessor.value = {...processors.value?.at(id)}
-  formProcessorId.value = undefined
+  formProcessor.value = {...processors.value?.filter(p => p.id === id)?.at(0)}
   formOpened.value = true
 }
 
@@ -145,5 +163,20 @@ const deleteProcessor = async (id: number) => {
     useToast().add({color: "green", title: "Successfully deleted processor", description: serverData.message})
   }
   await refresh()
+}
+
+const claimIndexing = (id: number) => {
+  useGoFetch(`/processors/${id}/index`, {method: "POST"}).then(({data, error, status}) => {
+    if (status.value === "error") {
+      useToast().add({
+        color: "red",
+        title: "Unable to indexing",
+        description: error.value?.data?.error || error.value?.message
+      })
+    } else if (status.value === "success") {
+      const serverData = data.value as { message?: string }
+      useToast().add({color: "green", title: "Successfully indexed", description: serverData.message})
+    }
+  })
 }
 </script>

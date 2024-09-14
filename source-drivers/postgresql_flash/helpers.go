@@ -39,6 +39,29 @@ func GetSqlForProcessor(processor *thunder.Processor) (string, error) {
 		query = query.LeftOuterJoin(join.Table, join.On)
 	}
 
+	// Append conditions
+	for _, condition := range processor.Conditions {
+		switch condition.Operator {
+		case "=":
+			query = query.Where(goqu.I(processor.Table + "." + condition.Column).Eq(condition.Value))
+			break
+		case "is null":
+			query = query.Where(goqu.I(processor.Table + "." + condition.Column).IsNull())
+			break
+		case "is not null":
+			query = query.Where(goqu.I(processor.Table + "." + condition.Column).IsNotNull())
+			break
+		case "is true":
+			query = query.Where(goqu.I(processor.Table + "." + condition.Column).IsTrue())
+			break
+		case "is false":
+			query = query.Where(goqu.I(processor.Table + "." + condition.Column).IsFalse())
+			break
+		default:
+			return "", errors.New(fmt.Sprintf("unsupported condition operator: %s", condition.Operator))
+		}
+	}
+
 	// Append primary keys
 	if len(processor.PrimaryKeys) == 0 {
 		return "", errors.New("primary keys must be set to fetch documents")
@@ -148,19 +171,32 @@ func processMapping(tableAlias string, mapping *thunder.Mapping, mappingJoins *j
 }
 
 func GetResultsSync[T any](conn *pgx.Conn, query string, timeout time.Duration, withIntermediateView bool) ([]*T, error) {
+
 	var results []*T
-	resultsChan, errChan := GetResultsChan[T](conn, query, withIntermediateView)
+	resultsChan := make(chan *T)
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(resultsChan)
+		GetResultsInChan[T](conn, query, withIntermediateView, resultsChan, errChan)
+	}()
 	timeoutChan := time.After(timeout)
+
 	for {
 		select {
 		case <-timeoutChan:
+			close(resultsChan)
+			close(errChan)
 			return nil, fmt.Errorf("timeout: no result received since %s", timeout)
 
 		case err := <-errChan:
+			close(errChan)
+			close(resultsChan)
 			return nil, err
 
 		case row, opened := <-resultsChan:
 			if !opened {
+				close(errChan)
 				return results, nil
 			}
 
@@ -169,44 +205,38 @@ func GetResultsSync[T any](conn *pgx.Conn, query string, timeout time.Duration, 
 		}
 	}
 }
+func GetResultsInChan[T any](conn *pgx.Conn, query string, withIntermediateView bool, resultsChan chan<- *T, errorChan chan error) {
+	if withIntermediateView {
+		// CAN BE USEFUL IF USER WANT A PREVIEW
+		// PREVIOUS TEST PROVE THAT IS SLOWER THAN QUERYING DIRECTLY
+		viewName := "tmp_" + generateAlias()
+		materializedQuery := fmt.Sprintf("CREATE MATERIALIZED VIEW %s AS %s", viewName, query)
 
-func GetResultsChan[T any](conn *pgx.Conn, query string, withIntermediateView bool) (<-chan *T, <-chan error) {
-	resultsChan := make(chan *T)
-	errorChan := make(chan error, 1)
-	go func() {
-		if withIntermediateView {
-			// CAN BE USEFUL IF USER WANT A PREVIEW
-			// PREVIOUS TEST PROVE THAT IS SLOWER THAN QUERYING DIRECTLY
-			viewName := "tmp_" + generateAlias()
-			materializedQuery := fmt.Sprintf("CREATE MATERIALIZED VIEW %s AS %s", viewName, query)
-
-			_, err := conn.Exec(context.Background(), materializedQuery)
-			if err != nil {
-				errorChan <- err
-			}
-
-			defer func() {
-				_, err := conn.Exec(context.Background(), fmt.Sprintf("DROP MATERIALIZED VIEW IF EXISTS %s", viewName))
-				if err != nil {
-					errorChan <- err
-				}
-			}()
-			query = "SELECT * FROM " + viewName
-		}
-		result, err := conn.Query(context.Background(), query)
+		_, err := conn.Exec(context.Background(), materializedQuery)
 		if err != nil {
 			errorChan <- err
 		}
-		defer result.Close()
 
-		for result.Next() {
-			document, err := pgx.RowToStructByName[T](result)
+		defer func() {
+			_, err := conn.Exec(context.Background(), fmt.Sprintf("DROP MATERIALIZED VIEW IF EXISTS %s", viewName))
 			if err != nil {
 				errorChan <- err
 			}
-			resultsChan <- &document
+		}()
+		query = "SELECT * FROM " + viewName
+	}
+
+	result, err := conn.Query(context.Background(), query)
+	if err != nil {
+		errorChan <- err
+	}
+	defer result.Close()
+
+	for result.Next() {
+		document, err := pgx.RowToStructByName[T](result)
+		if err != nil {
+			errorChan <- err
 		}
-		close(resultsChan)
-	}()
-	return resultsChan, errorChan
+		resultsChan <- &document
+	}
 }

@@ -17,7 +17,6 @@ func init() {
 
 type Driver struct {
 	config *DriverConfig
-	conn   *pgx.Conn
 }
 
 //go:embed icon.svg
@@ -27,21 +26,11 @@ func (d *Driver) DriverInfo() thunder.SourceDriverInfo {
 	return thunder.SourceDriverInfo{
 		ID: "postgresql_flash",
 		New: func(config any) (thunder.SourceDriver, error) {
-
 			cfg, ok := config.(*DriverConfig)
 			if !ok {
 				return nil, errors.New("invalid config type")
 			}
-
-			pgConn, err := d.newConn(cfg)
-			if err != nil {
-				return nil, err
-			}
-
-			return &Driver{
-				config: cfg,
-				conn:   pgConn,
-			}, nil
+			return &Driver{config: cfg}, nil
 		},
 
 		Name:   "PostgreSQL (Flash)",
@@ -60,6 +49,12 @@ func (d *Driver) TestConfig() (string, error) {
 }
 
 func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
+	conn, err := d.newConn()
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close(context.Background())
+
 	query := StatsQuery(d.config.Schema)
 	stats := thunder.SourceDriverStats{}
 	type RowResult struct {
@@ -68,7 +63,7 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 		PrimaryKeys []string `json:"primary_keys"`
 	}
 
-	results, err := GetResultsSync[RowResult](d.conn, query, time.Second*10, false)
+	results, err := GetResultsSync[RowResult](conn, query, time.Second*10, false)
 	if err != nil {
 		return nil, err
 	}
@@ -81,17 +76,24 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 	return &stats, nil
 }
 
-// TODO GET CHAN AS ARGS AND RETURN ERROR
-func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, limit uint64) (<-chan *thunder.Document, <-chan error) {
+func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, docChan chan<- *thunder.Document, errChan chan error, limit uint64) {
+	conn, err := d.newConn()
+	if err != nil {
+		errChan <- err
+		return
+	}
+	defer conn.Close(context.Background())
+
 	query, err := GetSqlForProcessor(processor)
 	if err != nil {
-		panic(err) // TODO ERR CHAN
+		errChan <- err
+		return
 	}
 	if limit > 0 {
 		query = fmt.Sprintf("%s LIMIT %s", query, strconv.FormatUint(limit, 10))
 	}
 
-	return GetResultsChan[thunder.Document](d.conn, query, false)
+	GetResultsInChan[thunder.Document](conn, query, false, docChan, errChan)
 }
 
 func (d *Driver) Start() error {
@@ -100,34 +102,31 @@ func (d *Driver) Start() error {
 }
 
 func (d *Driver) Stop() error {
-	if d.conn != nil {
-		return d.conn.Close(context.Background())
-	}
+
 	return nil
 }
 
 func (d *Driver) Shutdown() error {
-	if d.conn != nil {
-		return d.conn.Close(context.Background())
-	}
+
 	return nil
 }
 
-func (d *Driver) newConn(cfg *DriverConfig) (*pgx.Conn, error) {
+func (d *Driver) newConn() (*pgx.Conn, error) {
 	pgConnConfig, err := pgx.ParseConfig("")
 	if err != nil {
 		return nil, err
 	}
-	pgConnConfig.Host = cfg.Host
-	pgConnConfig.User = cfg.User
-	pgConnConfig.Port = cfg.Port
-	pgConnConfig.Password = cfg.Password
-	pgConnConfig.Database = cfg.Database
+	pgConnConfig.Host = d.config.Host
+	pgConnConfig.User = d.config.User
+	pgConnConfig.Port = d.config.Port
+	pgConnConfig.Password = d.config.Password
+	pgConnConfig.Database = d.config.Database
 
 	pgConn, err := pgx.ConnectConfig(context.Background(), pgConnConfig)
 	if err != nil {
 		return nil, err
 	}
+
 	return pgConn, nil
 }
 

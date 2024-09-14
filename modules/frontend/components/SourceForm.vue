@@ -4,7 +4,7 @@
       <UCard class="flex flex-col flex-1" :ui="{body: { base: 'flex-1' },rounded:''}">
         <template #header>
           <h2 class="text-center text-2xl font-semibold">
-            {{ {create: `New source`, edit: `Edit source n°${sourceId}`, read: `Source n° ${sourceId}`}[mode] }}
+            {{ {create: `New source`, edit: `Edit source n°${source?.id}`, read: `Source n° ${source?.id}`}[mode] }}
           </h2>
         </template>
         <fieldset :disabled="mode==='read'" class="grid gap-y-4">
@@ -54,10 +54,9 @@ import {z, type ZodObject, type ZodRawShape} from "zod";
 interface Props {
   mode: "create" | "edit" | "read"
   source?: any
-  sourceId?: number
 }
 
-const {mode = "create", source, sourceId} = defineProps<Props>()
+const {mode = "create", source} = defineProps<Props>()
 
 const opened = defineModel('opened')
 const $emit = defineEmits(['created', 'updated'])
@@ -104,7 +103,7 @@ const submit = async () => {
       useToast().add({title: 'Error', description: error.value?.data?.error || error.value?.message, color: 'red'})
     }
   } else if (mode === "edit") {
-    const {status, error, data} = await useGoFetch(`/sources/${sourceId}`, {
+    const {status, error, data} = await useGoFetch(`/sources/${source.id}`, {
       method: 'put',
       body: form,
       watch: false

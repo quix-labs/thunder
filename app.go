@@ -7,28 +7,22 @@ import (
 	"syscall"
 )
 
-type ProcessorState string
+type App struct {
+	loadedModules []Module
 
-// TODO DECOUPER LES LOGIQUE DE STATE DANS CHAQUE FICHIERS RESPECTIFS
-var (
-	ProcessorIndexing = ProcessorState("indexing")
-	ProcessorActive   = ProcessorState("active")
-	ProcessorInactive = ProcessorState("inactive")
-)
-
-type LoadedProcessors map[int]struct { // As [index]struct
-	State        ProcessorState `json:"state"`
-	SourceDriver SourceDriver   `json:"-"`
+	// Used by module to handle app events
+	broadcaster any
 }
 
-type AppState struct {
-	LoadedProcessor LoadedProcessors `json:"loaded_processors"`
-	LoadedModules   []Module         `json:"-"`
-}
+var app = new(App)
 
-var state AppState
+func GetApp() *App {
+	return app
+}
 
 func Start() error {
+	app := GetApp()
+
 	err := LoadConfig()
 	if err != nil {
 		return err
@@ -36,7 +30,7 @@ func Start() error {
 
 	// Load Modules
 	modules := GetModules()
-	state.LoadedModules = make([]Module, len(modules))
+	app.loadedModules = make([]Module, len(modules))
 	moduleErrChan := make(chan error)
 	for index, moduleInfo := range modules {
 		// Check dependencies
@@ -46,16 +40,19 @@ func Start() error {
 			}
 		}
 
-		state.LoadedModules[index] = moduleInfo.New()
+		app.loadedModules[index] = moduleInfo.New()
 		go func() {
-			err := state.LoadedModules[index].Start()
+			err := app.loadedModules[index].Start()
 			if err != nil {
 				moduleErrChan <- err
 			}
 		}()
 	}
 
-	//processors := GetConfig().Processors
+	// Load Processors
+	//if err = LoadAllProcessors(); err != nil {
+	//	return err
+	//}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -68,4 +65,32 @@ func Start() error {
 	}
 
 	return nil
+}
+
+func (app *App) Reload() error {
+	panic("not implemented")
+}
+
+func (app *App) IndexProcessor() error {
+	panic("not implemented")
+}
+
+func (app *App) AddProcessor() error {
+	panic("not implemented")
+}
+
+func (app *App) GetProcessor(id int) error {
+	panic("not implemented")
+}
+
+func (app *App) GetProcessors(id int) error {
+	panic("not implemented")
+}
+
+func (app *App) LoadConfig() error {
+	panic("not implemented")
+}
+
+func (app *App) SaveConfig() error {
+	panic("not implemented")
 }

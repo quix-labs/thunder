@@ -1,25 +1,25 @@
 <template>
-  <section>
+  <section class="grid gap-y-4">
     <UFormGroup label="Source" required name="source">
       <div class="grid grid-cols-2 gap-4">
-        <div v-for="([key,source]) in Object.entries(sources||{})" :key="key">
+        <div v-for="source in sources||[]" :key="`source-${source.id}`">
           <input
               type="radio"
               name="source"
               v-model="form.source"
-              :value="parseFloat(key)"
+              :value="source.id"
               class="sr-only peer"
-              :id="`source-${key}`"
+              :id="`source-${source.id}`"
               tabindex="-1"
           />
           <label
               tabindex="0"
-              @keydown.enter.space.prevent="form.driver=parseFloat(key)"
-              :for="`source-${key}`"
+              @keydown.enter.space.prevent="form.driver=source.id"
+              :for="`source-${source.id}`"
               class="cursor-pointer flex flex-col gap-y-2 items-center rounded-lg p-4 text-gray-900 dark:text-white bg-white dark:bg-gray-900 ring-1 ring-gray-200 dark:ring-gray-800 peer-checked:ring-2 peer-checked:ring-primary-500"
           >
-            <p class="font-semibold">Source n°{{ key }}</p>
-            <span class="italic text-gray-400" v-if="source.excerpt">{{source.excerpt}}</span>
+            <p class="font-semibold">Source n°{{ source.id }}</p>
+            <span class="italic text-gray-400" v-if="source.excerpt">{{ source.excerpt }}</span>
           </label>
         </div>
 
@@ -32,6 +32,7 @@
 
       </div>
     </UFormGroup>
+
     <UFormGroup label="Table" required name="table" v-if="availableTables">
       <USelectMenu
           creatable
@@ -61,6 +62,46 @@
         <template #empty>No columns available for the selected table.</template>
       </USelectMenu>
     </UFormGroup>
+
+    <UDivider label="Conditions"/>
+
+    <UCard v-for="(condition,index) in form.conditions"
+           :ui="{body:{base:'grid grid-cols-3 gap-x-4'},header:{base:'flex justify-between items-center'}}">
+      <template #header>
+        Condition {{ index }}
+        <UButton color="red" size="xs" icon="i-heroicons-trash" @click.prevent="removeCondition(index)"/>
+      </template>
+      <UFormGroup label="Column" required :name="`conditions.${index}.column`" v-if="availableTables">
+        <USelectMenu searchable creatable v-model="form.conditions[index].column"
+                     :options="availableTables?.[form.table]?.columns || []" placeholder="Select a column"/>
+      </UFormGroup>
+
+      <UFormGroup label="Operator" required :name="`conditions.${index}.operator`"
+                  v-if="form.conditions[index].column||null">
+        <USelectMenu
+            v-model="form.conditions[index].operator"
+            :options="[
+                {label:'IS',value:'='},
+                {label:'IS NULL',value:'is null'},
+                {label:'IS NOT NULL',value:'is not null'},
+                {label:'IS TRUE',value:'is true'},
+                {label:'IS FALSE',value:'is false'},
+            ]"
+            @change="form.conditions[index].value=undefined"
+            value-attribute="value"
+            option-attribute="label"
+            placeholder="Select an operator"/>
+      </UFormGroup>
+
+      <UFormGroup label="Value" required :name="`conditions.${index}.value`"
+                  v-if="form.conditions[index].operator==='='">
+        <UInput type="text" v-model="form.conditions[index].value" placeholder="Select an operator"/>
+      </UFormGroup>
+    </UCard>
+
+    <UButton class="text-center" block @click.prevent="form.conditions.push({})">+ Add condition</UButton>
+
+
     <SourceForm v-model:opened="createSourceOpened" @created="refresh" mode="create"/>
   </section>
 </template>
@@ -98,4 +139,12 @@ const createSourceOpened = ref(false);
 
 watch(() => form.value.source, computeAvailableTables);
 onMounted(computeAvailableTables)
+onBeforeMount(() => {
+  form.value.conditions ||= []
+})
+
+function removeCondition(index: number) {
+  form.value.conditions = form.value.conditions?.filter((_, key) => key !== index)
+
+}
 </script>

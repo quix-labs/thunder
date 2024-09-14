@@ -18,30 +18,35 @@ func TargetRoutes(mux *http.ServeMux) {
 }
 
 type TargetApiDetails struct {
+	ID      int    `json:"id"`
 	Driver  string `json:"driver"`
 	Config  any    `json:"config"`
 	Excerpt string `json:"excerpt"`
 }
 
 func listTargets(w http.ResponseWriter, r *http.Request) {
-	targets := thunder.GetConfig().Targets
-	var res = make(map[int]TargetApiDetails, len(targets))
+	targets := thunder.GetTargets()
+	var res []TargetApiDetails
 
-	for key, target := range targets {
-		res[key] = TargetApiDetails{
-			Driver:  target.Driver,
-			Config:  target.Config,
-			Excerpt: target.Config.Excerpt(),
+	for _, target := range targets {
+		serializeTarget, err := thunder.SerializeTarget(target)
+		if err != nil {
+			writeJsonError(w, http.StatusInternalServerError, err, "")
+			return
 		}
+
+		res = append(res, TargetApiDetails{
+			ID:      serializeTarget.ID,
+			Driver:  serializeTarget.Driver,
+			Config:  serializeTarget.Config,
+			Excerpt: target.Config.Excerpt(),
+		})
 	}
 	writeJsonResponse(w, http.StatusOK, res)
 }
 
 func createTarget(w http.ResponseWriter, r *http.Request) {
-	var p struct {
-		Driver string `json:"driver"`
-		Config any    `json:"config"`
-	}
+	var p thunder.JsonTarget
 	err := http_server.DecodeJSONBody(w, r, &p)
 	if err != nil {
 		var mr *http_server.MalformedRequest
@@ -54,21 +59,19 @@ func createTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	driver, err := thunder.GetTargetDriver(p.Driver)
+	target, err := thunder.UnserializeTarget(&p)
 	if err != nil {
 		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
-	configInstance, err := thunder.ConvertToDynamicConfig(&driver.Config, p.Config)
+	// Reset id to 0
+	target.ID = 0
+	err = thunder.AddTarget(target)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-
-	config := thunder.GetConfig()
-	config.Targets = append(config.Targets, thunder.Target{Driver: p.Driver, Config: configInstance})
-	thunder.SetConfig(config)
 
 	err = thunder.SaveConfig()
 	if err != nil {
@@ -88,11 +91,8 @@ func updateTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var p struct {
-		Driver string `json:"driver"`
-		Config any    `json:"config"`
-	}
-	err = http_server.DecodeJSONBody(w, r, &p)
+	var s thunder.JsonTarget
+	err = http_server.DecodeJSONBody(w, r, &s)
 	if err != nil {
 		var mr *http_server.MalformedRequest
 		if errors.As(err, &mr) {
@@ -104,32 +104,22 @@ func updateTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	driver, err := thunder.GetTargetDriver(p.Driver)
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
-		return
-	}
-
-	configInstance, err := thunder.ConvertToDynamicConfig(&driver.Config, p.Config)
+	newTarget, err := thunder.UnserializeTarget(&s)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	if (id + 1) > len(thunder.GetConfig().Targets) {
-		writeJsonError(w, http.StatusBadRequest, errors.New("invalid target"), "")
-		return
-	}
-
-	config := thunder.GetConfig()
-	config.Targets[id] = thunder.Target{Driver: p.Driver, Config: configInstance}
-	thunder.SetConfig(config)
-
-	err = thunder.SaveConfig()
-	if err != nil {
+	if err := thunder.UpdateTarget(id, newTarget); err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
+
+	if err = thunder.SaveConfig(); err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+
 	writeJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
@@ -143,14 +133,11 @@ func deleteTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (id + 1) > len(thunder.GetConfig().Targets) {
-		writeJsonError(w, http.StatusBadRequest, errors.New("invalid target"), "")
+	err = thunder.DeleteTarget(id)
+	if err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-
-	config := thunder.GetConfig()
-	config.Targets = append(config.Targets[:id], config.Targets[id+1:]...)
-	thunder.SetConfig(config)
 
 	err = thunder.SaveConfig()
 	if err != nil {

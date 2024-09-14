@@ -43,7 +43,6 @@
         :mode="formMode"
         v-model:opened="formOpened"
         :source="formSource"
-        :source-id="formSourceId"
     />
   </section>
 </template>
@@ -58,8 +57,8 @@ const columns = [
   {key: 'actions', sortable: false, rowClass: 'w-[1px] whitespace-nowrap'}
 ]
 
-const rows = computed(() => Object.entries(sources.value || {})?.map(([key, source]) => ({
-  id: parseFloat(key),
+const rows = computed(() => sources.value?.map(source => ({
+  id: source.id,
   excerpt: source.excerpt,
   driver: source.driver,
 })) || [])
@@ -69,31 +68,26 @@ const rows = computed(() => Object.entries(sources.value || {})?.map(([key, sour
 const formOpened = ref(false);
 const formMode = ref<"create" | "edit" | "read">("create");
 const formSource = ref<any>();
-const formSourceId = ref<number>();
 
 
 const create = () => {
   formMode.value = "create"
   formSource.value = undefined
-  formSourceId.value = undefined
   formOpened.value = true
 }
 const show = (id: number) => {
   formMode.value = "read"
-  formSource.value = sources.value?.[id]
-  formSourceId.value = id
+  formSource.value = sources.value?.filter(s => s.id === id)?.at(0)
   formOpened.value = true
 }
 const edit = (id: number) => {
   formMode.value = "edit"
-  formSource.value = sources.value?.[id]
-  formSourceId.value = id
+  formSource.value = sources.value?.filter(s => s.id === id)?.at(0)
   formOpened.value = true
 }
 const clone = (id: number) => {
   formMode.value = "create"
-  formSource.value = {...sources.value?.[id]}
-  formSourceId.value = undefined
+  formSource.value = {...sources.value?.filter(s => s.id === id)?.at(0)}
   formOpened.value = true
 }
 const remove = async (id: number) => {

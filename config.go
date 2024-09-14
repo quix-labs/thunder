@@ -8,25 +8,8 @@ import (
 	"sync"
 )
 
-type Source struct {
-	Driver string        `json:"driver"`
-	Config DynamicConfig `json:"config"`
-}
-
-type Target struct {
-	Driver string        `json:"driver"`
-	Config DynamicConfig `json:"config"`
-}
-
-type Config struct {
-	Sources    []Source    `json:"sources"`
-	Processors []Processor `json:"processors"`
-	Targets    []Target    `json:"targets"`
-}
-
 var (
 	configMu sync.RWMutex
-	config   Config
 	path     = "./config.json"
 )
 
@@ -42,6 +25,14 @@ func SetConfigPath(newPath string) {
 	path = newPath
 }
 
+// JSON TRANSFORMATION
+
+type JsonConfig struct {
+	Sources    []*JsonSource    `json:"sources"`
+	Targets    []*JsonTarget    `json:"targets"`
+	Processors []*JsonProcessor `json:"processors"`
+}
+
 func LoadConfig() error {
 	if _, err := os.Stat(GetConfigPath()); errors.Is(err, os.ErrNotExist) {
 		fmt.Println("config file doesn't exists, ignore load")
@@ -55,78 +46,89 @@ func LoadConfig() error {
 		return err
 	}
 
-	configMu.Lock()
-	defer configMu.Unlock()
-
-	var jsonConfig struct {
-		Sources []struct {
-			Driver string `json:"driver"`
-			Config any    `json:"config"`
-		} `json:"sources"`
-		Processors []Processor `json:"processors"`
-		Targets    []struct {
-			Driver string `json:"driver"`
-			Config any    `json:"config"`
-		} `json:"targets"`
-	}
-
+	var jsonConfig JsonConfig
 	if err = json.Unmarshal(content, &jsonConfig); err != nil {
 		return err
 	}
 
-	// Parse source config
-	config.Sources = make([]Source, len(jsonConfig.Sources))
-	for idx, source := range jsonConfig.Sources {
-		if driver, err := GetSourceDriver(source.Driver); err == nil {
-			if typedConfig, err := ConvertToDynamicConfig(&driver.Config, source.Config); err == nil {
-				config.Sources[idx] = Source{
-					Driver: source.Driver,
-					Config: typedConfig,
-				}
-			}
+	// Parse jsonSource config
+	for _, jsonSource := range jsonConfig.Sources {
+		source, err := UnserializeSource(jsonSource)
+		if err != nil {
+			return err
+		}
+		if err = AddSource(source); err != nil {
+			return err
 		}
 	}
 
-	// Assign processors
-	config.Processors = jsonConfig.Processors
+	// Parse jsonTargets config
+	for _, jsonTarget := range jsonConfig.Targets {
+		target, err := UnserializeTarget(jsonTarget)
+		if err != nil {
+			return err
+		}
 
-	// Parse target config
-	config.Targets = make([]Target, len(jsonConfig.Targets))
-	for idx, target := range jsonConfig.Targets {
-		if driver, err := GetTargetDriver(target.Driver); err == nil {
-			if typedConfig, err := ConvertToDynamicConfig(&driver.Config, target.Config); err == nil {
-				config.Targets[idx] = Target{
-					Driver: target.Driver,
-					Config: typedConfig,
-				}
-			}
+		if err = AddTarget(target); err != nil {
+			return err
 		}
 	}
+
+	// Parse jsonProcessors config
+	for _, jsonProcessor := range jsonConfig.Processors {
+		processor, err := UnserializeProcessor(jsonProcessor)
+		if err != nil {
+			return err
+		}
+
+		if err = AddProcessor(processor); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 func SaveConfig() error {
-	configMu.RLock()
-	defer configMu.RUnlock()
+	var config JsonConfig
 
-	b, err := json.MarshalIndent(config, "", "\t")
+	// Add sources
+	config.Sources = []*JsonSource{}
+	for _, source := range GetSources() {
+		jsonSource, err := SerializeSource(source)
+		if err != nil {
+			return err
+		}
+		config.Sources = append(config.Sources, jsonSource)
+	}
+
+	// Add Processors
+	config.Processors = []*JsonProcessor{}
+	for _, processor := range GetProcessors() {
+		jsonProcessor, err := SerializeProcessor(processor)
+		if err != nil {
+			return err
+		}
+		config.Processors = append(config.Processors, jsonProcessor)
+	}
+
+	// Add targets
+	config.Targets = []*JsonTarget{}
+	for _, target := range GetTargets() {
+		jsonTarget, err := SerializeTarget(target)
+		if err != nil {
+			return err
+		}
+		config.Targets = append(config.Targets, jsonTarget)
+	}
+
+	bytes, err := json.MarshalIndent(config, "", "\t")
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(GetConfigPath(), b, 0666); err != nil {
+
+	if err = os.WriteFile(GetConfigPath(), bytes, 0644); err != nil {
 		return err
 	}
 	return nil
-}
-
-func GetConfig() Config {
-	configMu.RLock()
-	defer configMu.RUnlock()
-	return config
-}
-
-func SetConfig(new Config) {
-	configMu.Lock()
-	defer configMu.Unlock()
-	config = new
 }

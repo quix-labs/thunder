@@ -19,16 +19,50 @@ func ProcessorRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /go-api/processors", createProcessor)
 	mux.HandleFunc("PUT /go-api/processors/{id}", updateProcessor)
 	mux.HandleFunc("DELETE /go-api/processors/{id}", deleteProcessor)
+	mux.HandleFunc("POST /go-api/processors/{id}/index", indexProcessor)
 
+}
+
+type ProcessorApiDetails struct {
+	Status      thunder.ProcessorStatus `json:"status"`
+	ID          int                     `json:"id"`
+	Source      int                     `json:"source"`  // as source_id
+	Targets     []int                   `json:"targets"` // as targets_id
+	Table       string                  `json:"table"`
+	PrimaryKeys []string                `json:"primary_keys"`
+	Conditions  []thunder.Condition     `json:"conditions"`
+	Mapping     thunder.Mapping         `json:"mapping"`
+	Index       string                  `json:"index"`
+	Enabled     bool                    `json:"enabled"`
 }
 
 func listProcessors(w http.ResponseWriter, r *http.Request) {
-	writeJsonResponse(w, http.StatusOK, thunder.GetConfig().Processors)
+	processors := thunder.GetProcessors()
+	var res []ProcessorApiDetails
+	for _, processor := range processors {
+		serializedProcessor, err := thunder.SerializeProcessor(processor)
+		if err != nil {
+			writeJsonError(w, http.StatusInternalServerError, err, "")
+			return
+		}
+		res = append(res, ProcessorApiDetails{
+			Status:      processor.Status,
+			ID:          serializedProcessor.ID,
+			Source:      serializedProcessor.Source,
+			Targets:     serializedProcessor.Targets,
+			Table:       serializedProcessor.Table,
+			PrimaryKeys: serializedProcessor.PrimaryKeys,
+			Conditions:  serializedProcessor.Conditions,
+			Mapping:     serializedProcessor.Mapping,
+			Index:       serializedProcessor.Index,
+			Enabled:     serializedProcessor.Enabled,
+		})
+	}
+	writeJsonResponse(w, http.StatusOK, res)
 }
 
 func testProcessor(w http.ResponseWriter, r *http.Request) {
-	var p thunder.Processor
-
+	var p thunder.JsonProcessor
 	err := http_server.DecodeJSONBody(w, r, &p)
 	if err != nil {
 		var mr *http_server.MalformedRequest
@@ -41,33 +75,22 @@ func testProcessor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (p.Source + 1) > len(thunder.GetConfig().Sources) {
-		writeJsonError(w, http.StatusBadRequest, errors.New("invalid source"), "")
-		return
-	}
-	for _, targetId := range p.Targets {
-		if (targetId + 1) > len(thunder.GetConfig().Targets) {
-			writeJsonError(w, http.StatusBadRequest, errors.New(fmt.Sprintf("invalid target %d", targetId)), "")
-			return
-		}
-	}
-	// Get related
-	source := thunder.GetConfig().Sources[p.Source]
-	driverInfo, err := thunder.GetSourceDriver(source.Driver)
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
-		return
-	}
-
-	driver, err := driverInfo.New(source.Config)
+	processor, err := thunder.UnserializeProcessor(&p)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-	defer driver.Shutdown()
 
 	// TRY TO FETCH 1 DOCUMENT
-	docChan, errChan := driver.GetDocumentsForProcessor(&p, 1)
+	var docChan = make(chan *thunder.Document, 1)
+	var errChan = make(chan error, 1)
+
+	go func() {
+		defer close(docChan)
+		defer close(errChan)
+		processor.Source.Driver.GetDocumentsForProcessor(processor, docChan, errChan, 1)
+	}()
+
 	select {
 	case doc, open := <-docChan:
 		if !open {
@@ -87,15 +110,13 @@ func testProcessor(w http.ResponseWriter, r *http.Request) {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	case <-time.After(time.Second * 5):
-		writeJsonError(w, http.StatusInternalServerError, err, "timeout reached")
+		writeJsonError(w, http.StatusInternalServerError, errors.New("timeout reached"), "database took more than 5s to generate document")
 		return
 	}
 }
 
 func createProcessor(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	var p thunder.Processor
+	var p thunder.JsonProcessor
 
 	err := http_server.DecodeJSONBody(w, r, &p)
 	if err != nil {
@@ -109,44 +130,35 @@ func createProcessor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (p.Source + 1) > len(thunder.GetConfig().Sources) {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"Invalid source"}`)))
-		return
-	}
-	for _, targetId := range p.Targets {
-		if (targetId + 1) > len(thunder.GetConfig().Targets) {
-			writeJsonError(w, http.StatusBadRequest, errors.New(fmt.Sprintf("invalid target %d", targetId)), "")
-			return
-		}
-	}
-	config := thunder.GetConfig()
-	config.Processors = append(config.Processors, p)
-	thunder.SetConfig(config)
-
-	err = thunder.SaveConfig()
+	processor, err := thunder.UnserializeProcessor(&p)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
-
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(`{"success":true,"message":"Processor created"}`))
+	processor.ID = 0
+	if err := thunder.AddProcessor(processor); err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+	if err = thunder.SaveConfig(); err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+	writeJsonResponse(w, http.StatusOK, struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{true, "Processor created"})
 }
 
 func updateProcessor(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"ID is not an integer"}`)))
+		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
 		return
 	}
 
-	var p thunder.Processor
-
-	err = http_server.DecodeJSONBody(w, r, &p)
+	var s thunder.JsonProcessor
+	err = http_server.DecodeJSONBody(w, r, &s)
 	if err != nil {
 		var mr *http_server.MalformedRequest
 		if errors.As(err, &mr) {
@@ -158,52 +170,74 @@ func updateProcessor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (p.Source + 1) > len(thunder.GetConfig().Sources) {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"Invalid source"}`)))
-		return
-	}
-
-	for _, targetId := range p.Targets {
-		if (targetId + 1) > len(thunder.GetConfig().Targets) {
-			writeJsonError(w, http.StatusBadRequest, errors.New(fmt.Sprintf("invalid target %d", targetId)), "")
-			return
-		}
-	}
-
-	config := thunder.GetConfig()
-	config.Processors[id] = p
-	thunder.SetConfig(config)
-
-	err = thunder.SaveConfig()
+	newProcessor, err := thunder.UnserializeProcessor(&s)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	w.Write([]byte(fmt.Sprintf(`{"success":true,"message":"Processor %d updated!"}`, id)))
+	if err := thunder.UpdateProcessor(id, newProcessor); err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+
+	if err = thunder.SaveConfig(); err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+
+	writeJsonResponse(w, http.StatusOK, struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{true, fmt.Sprintf("Processor %d updated", id)})
 }
 
 func deleteProcessor(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"ID is not an integer"}`)))
+		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
 		return
 	}
 
-	config := thunder.GetConfig()
-	config.Processors = append(config.Processors[:id], config.Processors[id+1:]...)
-	thunder.SetConfig(config)
+	err = thunder.DeleteProcessor(id)
+	if err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
 
 	err = thunder.SaveConfig()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-	w.Write([]byte(fmt.Sprintf(`{"success":true,"message":"Processor %d deleted!"}`, id)))
+
+	writeJsonResponse(w, http.StatusOK, struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{true, fmt.Sprintf(`Processor %d deleted!`, id)})
+}
+
+func indexProcessor(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
+		return
+	}
+
+	processor, err := thunder.GetProcessor(id)
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, err, "")
+		return
+	}
+
+	go func() {
+		if err := processor.FullIndex(); err != nil {
+			return // TODO
+		}
+	}()
+
+	writeJsonResponse(w, http.StatusOK, struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{true, "Indexing claimed"})
 }

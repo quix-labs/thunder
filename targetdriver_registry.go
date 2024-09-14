@@ -6,25 +6,6 @@ import (
 	"sync"
 )
 
-type TargetDriverInfo struct {
-	ID  string                                 `json:"ID"`
-	New func(config any) (TargetDriver, error) `json:"-"`
-
-	Name   string        `json:"name"`
-	Config DynamicConfig `json:"-"`
-
-	// As inlined SVG
-	Image string   `json:"image,omitempty"`
-	Notes []string `json:"notes,omitempty"`
-}
-
-type TargetDriver interface {
-	DriverInfo() TargetDriverInfo
-
-	TestConfig() (string, error) // TODO USELESS REPLACE IN FAVOR OF STATS TO CHECK NOT EMPTY
-}
-
-// REGISTERING MODULES
 var (
 	targetDrivers   = make(map[string]TargetDriverInfo)
 	targetDriversMu sync.RWMutex

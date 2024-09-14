@@ -19,30 +19,35 @@ func SourceRoutes(mux *http.ServeMux) {
 }
 
 type SourceApiDetails struct {
+	ID      int    `json:"id"`
 	Driver  string `json:"driver"`
 	Config  any    `json:"config"`
 	Excerpt string `json:"excerpt"`
 }
 
 func listSources(w http.ResponseWriter, r *http.Request) {
-	sources := thunder.GetConfig().Sources
-	var res = make(map[int]SourceApiDetails, len(sources))
+	sources := thunder.GetSources()
+	var res []SourceApiDetails
 
-	for key, source := range sources {
-		res[key] = SourceApiDetails{
-			Driver:  source.Driver,
-			Config:  source.Config,
-			Excerpt: source.Config.Excerpt(),
+	for _, source := range sources {
+		serializeSource, err := thunder.SerializeSource(source)
+		if err != nil {
+			writeJsonError(w, http.StatusInternalServerError, err, "")
+			return
 		}
+		res = append(res, SourceApiDetails{
+			ID:      serializeSource.ID,
+			Driver:  serializeSource.Driver,
+			Config:  serializeSource.Config,
+			Excerpt: source.Config.Excerpt(),
+		})
 	}
 	writeJsonResponse(w, http.StatusOK, res)
 }
 
 func createSource(w http.ResponseWriter, r *http.Request) {
-	var p struct {
-		Driver string `json:"driver"`
-		Config any    `json:"config"`
-	}
+	var p thunder.JsonSource
+
 	err := http_server.DecodeJSONBody(w, r, &p)
 	if err != nil {
 		var mr *http_server.MalformedRequest
@@ -55,21 +60,19 @@ func createSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	driver, err := thunder.GetSourceDriver(p.Driver)
+	source, err := thunder.UnserializeSource(&p)
 	if err != nil {
 		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
-	configInstance, err := thunder.ConvertToDynamicConfig(&driver.Config, p.Config)
+	// Reset id to 0
+	source.ID = 0
+	err = thunder.AddSource(source)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-
-	config := thunder.GetConfig()
-	config.Sources = append(config.Sources, thunder.Source{Driver: p.Driver, Config: configInstance})
-	thunder.SetConfig(config)
 
 	err = thunder.SaveConfig()
 	if err != nil {
@@ -89,11 +92,8 @@ func updateSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var p struct {
-		Driver string `json:"driver"`
-		Config any    `json:"config"`
-	}
-	err = http_server.DecodeJSONBody(w, r, &p)
+	var s thunder.JsonSource
+	err = http_server.DecodeJSONBody(w, r, &s)
 	if err != nil {
 		var mr *http_server.MalformedRequest
 		if errors.As(err, &mr) {
@@ -105,32 +105,22 @@ func updateSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	driver, err := thunder.GetSourceDriver(p.Driver)
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
-		return
-	}
-
-	configInstance, err := thunder.ConvertToDynamicConfig(&driver.Config, p.Config)
+	newSource, err := thunder.UnserializeSource(&s)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	if (id + 1) > len(thunder.GetConfig().Sources) {
-		writeJsonError(w, http.StatusBadRequest, errors.New("invalid source"), "")
-		return
-	}
-
-	config := thunder.GetConfig()
-	config.Sources[id] = thunder.Source{Driver: p.Driver, Config: configInstance}
-	thunder.SetConfig(config)
-
-	err = thunder.SaveConfig()
-	if err != nil {
+	if err := thunder.UpdateSource(id, newSource); err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
+
+	if err = thunder.SaveConfig(); err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+
 	writeJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
@@ -144,14 +134,11 @@ func deleteSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (id + 1) > len(thunder.GetConfig().Sources) {
-		writeJsonError(w, http.StatusBadRequest, errors.New("invalid source"), "")
+	err = thunder.DeleteSource(id)
+	if err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-
-	config := thunder.GetConfig()
-	config.Sources = append(config.Sources[:id], config.Sources[id+1:]...)
-	thunder.SetConfig(config)
 
 	err = thunder.SaveConfig()
 	if err != nil {
@@ -172,28 +159,17 @@ func getSourceStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (id + 1) > len(thunder.GetConfig().Sources) {
-		writeJsonError(w, http.StatusBadRequest, errors.New("invalid source"), "")
-		return
-	}
-
-	source := thunder.GetConfig().Sources[id]
-	driver, err := thunder.GetSourceDriver(source.Driver)
+	source, err := thunder.GetSource(id)
 	if err != nil {
 		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
-	driverInstance, err := driver.New(source.Config)
+	stats, err := source.Driver.Stats()
 	if err != nil {
 		writeJsonError(w, http.StatusUnprocessableEntity, err, "")
 		return
 	}
 
-	stats, err := driverInstance.Stats()
-	if err != nil {
-		writeJsonError(w, http.StatusUnprocessableEntity, err, "")
-		return
-	}
 	writeJsonResponse(w, http.StatusOK, stats)
 }

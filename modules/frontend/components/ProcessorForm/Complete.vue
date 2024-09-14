@@ -18,7 +18,13 @@
         <!--Toolbar-->
         <div class="col-span-full flex justify-between border-b p-4">
           <h2 @click.prevent="submit" class="col-span-full  text-center text-2xl font-semibold">
-            {{ {create: `New processor`, edit: `Edit processor: TODO id`, read: 'Processor: TODO id'}[mode] }}
+            {{
+              {
+                create: `New processor`,
+                edit: `Edit processor: ${processor?.id}`,
+                read: `Processor: ${processor?.id}`
+              }[mode]
+            }}
           </h2>
           <div class="flex gap-x-4">
             <label class="flex items-center gap-x-4 cursor-pointer" v-if="mode!=='read'">
@@ -66,15 +72,15 @@ const state = useProcessFormState()
 interface Props {
   mode: "create" | "edit" | "read"
   processor?: any
-  processorId?: number
 }
 
-const {mode = "create", processor, processorId} = defineProps<Props>()
+const {mode = "create", processor} = defineProps<Props>()
 
 const defaultForm = reactive({
   source: null as number | null,
   table: null as string | null,
   primary_keys: [] as string[] | null,
+  conditions: [] as any[] | null,
 
   targets: [] as string[],
   index: null as string | null,
@@ -98,7 +104,7 @@ const submit = async () => {
       useToast().add({title: 'Error', description: error.value?.message, color: 'red'})
     }
   } else if (mode === "edit") {
-    const {status, error, data} = await useGoFetch(`/processors/${processorId}`, {
+    const {status, error, data} = await useGoFetch(`/processors/${processor.id}`, {
       method: 'put',
       body: form,
       watch: false
