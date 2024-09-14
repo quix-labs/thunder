@@ -22,7 +22,6 @@ Thumbs.db
 /go/bin/
 /go/pkg/
 /go/src/
-go.sum
 *.prof
 /development
 go.work
