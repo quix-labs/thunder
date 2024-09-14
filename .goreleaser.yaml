@@ -1,0 +1,97 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+
+# The lines below are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/need to use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+project_name: thunder
+before:
+  hooks:
+    - go mod download
+    - go mod tidy
+
+builds:
+  - id: nonlinux
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    dir: app
+
+  - id: linux
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - "386"
+    dir: app
+
+nfpms:
+  - maintainer: Quix Labs <contact@quix-labs.com>
+    description: "Fast, efficient, and optimized synchronization between SQL databases and indexers."
+    homepage: "https://github.com/quix-labs/{{.ProjectName}}"
+    license: MIT
+    formats: [ deb, rpm, apk ]
+
+dockers:
+  - image_templates:
+      - "ghcr.io/quix-labs/{{.ProjectName}}:{{.Version}}-amd64"
+    dockerfile: goreleaser.Dockerfile
+    use: buildx
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://github.com/quix-labs/{{ .ProjectName }}
+      - --label=org.opencontainers.image.source=https://github.com/quix-labs/{{ .ProjectName }}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=MIT
+
+  - image_templates:
+      - "ghcr.io/quix-labs/{{.ProjectName}}:{{.Version}}-arm64v8"
+    dockerfile: goreleaser.Dockerfile
+    use: buildx
+    build_flag_templates:
+      - --platform=linux/arm64/v8
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://github.com/quix-labs/{{ .ProjectName }}
+      - --label=org.opencontainers.image.source=https://github.com/quix-labs/{{ .ProjectName }}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=MIT
+
+docker_manifests:
+  - name_template: ghcr.io/quix-labs/{{ .ProjectName }}:v{{ .Major }}.{{ .Minor }}
+    image_templates:
+      - ghcr.io/quix-labs/{{ .ProjectName }}:{{ .Version }}-amd64
+      - ghcr.io/quix-labs/{{ .ProjectName }}:{{ .Version }}-arm64v8
+
+  - name_template: ghcr.io/quix-labs/{{ .ProjectName }}:v{{ .Major }}
+    image_templates:
+      - ghcr.io/quix-labs/{{ .ProjectName }}:{{ .Version }}-amd64
+      - ghcr.io/quix-labs/{{ .ProjectName }}:{{ .Version }}-arm64v8
+
+  - name_template: ghcr.io/quix-labs/{{ .ProjectName }}:latest
+    image_templates:
+      - ghcr.io/quix-labs/{{ .ProjectName }}:{{ .Version }}-amd64
+      - ghcr.io/quix-labs/{{ .ProjectName }}:{{ .Version }}-arm64v8
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
