@@ -41,59 +41,77 @@ Contributions and feedback are welcome!
 
 ## Installation
 
-### Using go (build from source)
 
-```bash
-cd /path/your/want
-go mod init thunder
-go get -u github.com/quix-labs/thunder/app@main
+### Using Docker
 
-touch main.go # Create base app file
-```
+- Pull the Docker image from the GitHub Container Registry:
+    ```bash
+    docker pull ghcr.io/quix-labs/thunder:latest
+    ```
+- Start container
+  ```bash
+  docker run -p 3000:3000 -v "./config.json:/config.json"  --name thunder ghcr.io/quix-labs/thunder:latest
+  ```
+  
+### Using prebuilt assets
 
-Edit `main.go` and put this:
+You can also install the tool using release assets such as `.deb`, `.apk`, or others.
 
-```go
-package main
+Download the appropriate package from the [Releases page](https://github.com/quix-labs/thunder/releases), and then follow the instructions provided for your specific platform.
 
-import (
-	"github.com/quix-labs/thunder"
-	// Remove unnecessary modules/drivers
-	_ "github.com/quix-labs/thunder/modules/api"
-	_ "github.com/quix-labs/thunder/modules/frontend"
-	_ "github.com/quix-labs/thunder/modules/http_server"
-	_ "github.com/quix-labs/thunder/source-drivers/postgresql_flash"
-	_ "github.com/quix-labs/thunder/target-drivers/elastic"
-)
 
-func main() {
-	err := thunder.Start()
-	if err != nil {
-		panic(err)
-	}
-}
-```
+### Using go (build from source as library)
 
-Compile your app:
+- Create boilerplate
+    ```bash
+    cd /path/your/want
+    go mod init your_app_name
+    go get -u github.com/quix-labs/thunder/app@main
+    
+    touch main.go # Create base app file
+    ```
 
-```bash
-go mod tidy #Download add modules/drivers from main.go
+- Edit `main.go` and put this:
+    ```go
+    package main
+    
+    import (
+        "github.com/quix-labs/thunder"
+        // Remove unnecessary modules/drivers
+        _ "github.com/quix-labs/thunder/modules/api"
+        _ "github.com/quix-labs/thunder/modules/frontend"
+        _ "github.com/quix-labs/thunder/modules/http_server"
+        _ "github.com/quix-labs/thunder/source-drivers/postgresql_flash"
+        _ "github.com/quix-labs/thunder/target-drivers/elastic"
+    )
+    
+    func main() {
+        err := thunder.Start()
+        if err != nil {
+            panic(err)
+        }
+    }
+    ```
 
-# CGO_ENABLED=0 is optional, but better for cross-platform compilation
-# Ignore it if your are building directly on the target
+- Compile your app:
 
-CGO_ENABLED=0 go build -ldflags="-s -w" -o thunder
-```
+    ```bash
+    go mod tidy #Download add modules/drivers from main.go
+    
+    # CGO_ENABLED=0 is optional, but better for cross-platform compilation
+    # Ignore it if your are building directly on the target
+    
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o your_app_name
+    ```
 
-Start your compiled app:
-
-```bash
-./thunder
-
-# Actually, the config.json file will be placed in the current directory
-
-# You can now access localhost:3000 and configure
-```
+- Start your compiled app:
+    ```bash
+    ./your_app_name
+    
+    # Actually, the config.json file will be placed in the current directory
+    
+    # You can now access localhost:3000 and configure
+    ```
 
 ## How to configure
 
