@@ -122,6 +122,8 @@ func (d *Driver) newConn() (*pgx.Conn, error) {
 	pgConnConfig.Password = d.config.Password
 	pgConnConfig.Database = d.config.Database
 
+	pgConnConfig.RuntimeParams["sslmode"] = "disable"
+
 	pgConn, err := pgx.ConnectConfig(context.Background(), pgConnConfig)
 	if err != nil {
 		return nil, err
