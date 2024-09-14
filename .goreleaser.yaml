@@ -22,10 +22,8 @@ builds:
     goarch:
       - amd64
       - arm64
-    dir: .
-    main: ./app
-
-
+    dir: app
+    
   - id: linux
     env:
       - CGO_ENABLED=0

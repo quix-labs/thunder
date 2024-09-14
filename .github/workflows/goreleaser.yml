@@ -1,9 +1,6 @@
 name: Build Static Releases
 
 on:
-  push:
-    branches:
-      - main
   release:
     types: [ created ]
 
