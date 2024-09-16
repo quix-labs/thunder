@@ -1,5 +1,7 @@
 package thunder
 
+import "context"
+
 type TargetDriverInfo struct {
 	ID  string                                 `json:"ID"`
 	New func(config any) (TargetDriver, error) `json:"-"`
@@ -17,7 +19,7 @@ type TargetDriver interface {
 
 	TestConfig() (string, error) // TODO USELESS REPLACE IN FAVOR OF STATS TO CHECK NOT EMPTY
 
-	IndexDocumentsForProcessor(processor *Processor, docChan <-chan *Document, errChan chan error)
+	HandleEvents(processor *Processor, eventsChan <-chan Event, ctx context.Context) error
 
 	Shutdown() error
 }

@@ -1,16 +1,10 @@
 package thunder
 
 import (
+	"context"
 	"errors"
 	"sync"
-)
-
-type ProcessorStatus string
-
-var (
-	ProcessorIndexing  = ProcessorStatus("indexing")
-	ProcessorListening = ProcessorStatus("listening")
-	ProcessorInactive  = ProcessorStatus("inactive")
+	"sync/atomic"
 )
 
 type Condition struct {
@@ -22,7 +16,10 @@ type Condition struct {
 type Processor struct {
 	ID int
 
-	Status ProcessorStatus
+	Indexing atomic.Bool
+
+	Listening     atomic.Bool
+	ContextCancel context.CancelFunc
 
 	Source  *Source
 	Targets []*Target
@@ -43,17 +40,106 @@ type Document struct {
 	Json        []byte   `json:"json"`
 }
 
-func (p *Processor) FullIndex() error {
-	if p.Status != ProcessorInactive {
-		return errors.New("processor is active")
+// Target events
+
+type InsertEvent struct {
+	PrimaryKeys []string
+	Json        []byte
+}
+
+type PatchEvent struct {
+	Path        string //TODO
+	PrimaryKeys []string
+	JsonPatch   []byte
+}
+
+type DeleteEvent struct {
+	PrimaryKeys []string
+}
+
+type TruncateEvent struct{}
+
+type Event any // DeleteEvent | InsertEvent | PatchEvent | TruncateEvent
+
+func (p *Processor) Start() error {
+	if p.Listening.Load() {
+		return errors.New("processor is already listening")
 	}
 
-	p.Status = ProcessorIndexing
+	p.Listening.Store(true)
+	GetBroadcaster().Dispatch("processor-updated", p.ID)
+
+	defer func() {
+		p.Listening.Store(false)
+		GetBroadcaster().Dispatch("processor-updated", p.ID)
+	}()
+
+	// Create the context with cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+	p.ContextCancel = cancel
+	defer p.ContextCancel()
+
+	var eventsChan = make(chan Event)
+	defer close(eventsChan)
+
+	// Bootstrap target channels
+	var targetChannels = make([]chan Event, len(p.Targets))
+	for i, _ := range p.Targets {
+		targetChannels[i] = make(chan Event, 1)
+	}
+
+	// Start target in parallel
+	var wg sync.WaitGroup
+	for i, target := range p.Targets {
+		wg.Add(1)
+		idx := i
+		go func() {
+			defer wg.Done()
+			defer close(targetChannels[idx])
+			if err := target.Driver.HandleEvents(p, targetChannels[idx], ctx); err != nil && !errors.Is(err, context.Canceled) {
+				cancel()
+			}
+		}()
+	}
+
+	// Start broadcasting events
+	go func() {
+		for event := range eventsChan {
+			for _, channel := range targetChannels {
+				channel <- event
+			}
+		}
+	}()
+
+	// Start driver event handling
+	err := p.Source.Driver.Start(p, eventsChan, ctx)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		cancel()
+	}
+	wg.Wait() // Wait for processor stopped
+
+	return err
+}
+
+func (p *Processor) Stop() error {
+	if p.Listening.Load() {
+		p.ContextCancel()
+		GetBroadcaster().Dispatch("processor-updated", p.ID)
+	}
+	return nil
+}
+
+func (p *Processor) FullIndex() error {
+	if p.Indexing.Load() {
+		return errors.New("processor is already indexing")
+	}
+	p.Indexing.Store(true)
 	GetBroadcaster().Dispatch("processor-updated", p.ID)
 	defer func() {
-		p.Status = ProcessorInactive
+		p.Indexing.Store(false)
 		GetBroadcaster().Dispatch("processor-indexed", p.ID)
 		GetBroadcaster().Dispatch("processor-updated", p.ID)
+		//TODO RESTART IF STOPPED NOT WORK
 	}()
 
 	// Start indexing
@@ -66,9 +152,9 @@ func (p *Processor) FullIndex() error {
 	}()
 
 	// Initialize channels
-	var targetsDocChan = make([]chan *Document, len(p.Targets))
+	var targetEventsChans = make([]chan Event, len(p.Targets))
 	for idx, _ := range p.Targets {
-		targetsDocChan[idx] = make(chan *Document, 1)
+		targetEventsChans[idx] = make(chan Event, 1)
 	}
 
 	// Start targets in parallel
@@ -79,7 +165,10 @@ func (p *Processor) FullIndex() error {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				target.Driver.IndexDocumentsForProcessor(p, targetsDocChan[idx], errChan)
+				if err := target.Driver.HandleEvents(p, targetEventsChans[idx], context.Background()); err != nil {
+					errChan <- err
+				}
+
 			}()
 		}
 		wg.Wait()
@@ -89,8 +178,8 @@ func (p *Processor) FullIndex() error {
 		case doc, open := <-docChan:
 			if !open {
 				// Send end signal
-				for _, targetDocChan := range targetsDocChan {
-					close(targetDocChan)
+				for _, targetEventChan := range targetEventsChans {
+					close(targetEventChan)
 				}
 
 				// Wait for all closed or err
@@ -98,8 +187,12 @@ func (p *Processor) FullIndex() error {
 			}
 
 			// Dispatch across different targets
-			for _, targetDocChan := range targetsDocChan {
-				targetDocChan <- doc
+			for _, targetEventChan := range targetEventsChans {
+				event := &InsertEvent{
+					PrimaryKeys: doc.PrimaryKeys,
+					Json:        doc.Json,
+				}
+				targetEventChan <- event
 			}
 
 		case err, opened := <-errChan:
@@ -108,8 +201,8 @@ func (p *Processor) FullIndex() error {
 			}
 			if err != nil {
 				// TODO STOP docChan
-				for _, targetDocChan := range targetsDocChan {
-					close(targetDocChan)
+				for _, targetEventChan := range targetEventsChans {
+					close(targetEventChan)
 				}
 				<-errChan
 				return err

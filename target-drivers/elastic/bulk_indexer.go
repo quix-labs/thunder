@@ -5,6 +5,8 @@ import (
 	"context"
 	"github.com/elastic/go-elasticsearch/v8"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 type BulkIndexer struct {
@@ -12,7 +14,9 @@ type BulkIndexer struct {
 	_queue  [][]byte
 	_client *elasticsearch.TypedClient
 
-	BatchMaxSize int
+	_lastSent         time.Time
+	pendingOperations atomic.Int64
+	BatchMaxSize      int
 }
 
 func NewBulkIndexer(client *elasticsearch.TypedClient, batchMaxSize int) *BulkIndexer {
@@ -23,20 +27,42 @@ func NewBulkIndexer(client *elasticsearch.TypedClient, batchMaxSize int) *BulkIn
 	}
 }
 
-func (bi *BulkIndexer) Add(operation []byte, data []byte) {
+func (bi *BulkIndexer) Add(lines ...[]byte) {
 	bi.mu.Lock()
-	bi._queue = append(bi._queue, operation, data)
+	bi._queue = append(bi._queue, lines...)
 	bi.mu.Unlock()
 
-	if len(bi._queue) >= bi.BatchMaxSize*2 {
+	bi.pendingOperations.Add(1)
+
+	if bi.pendingOperations.Load() >= int64(bi.BatchMaxSize) {
 		bi.flush()
 	}
 }
 
 func (bi *BulkIndexer) Close() {
-	if len(bi._queue) > 0 {
+	if bi.pendingOperations.Load() > 0 {
 		bi.flush()
 	}
+}
+
+func (bi *BulkIndexer) AddSendTimeout(duration time.Duration) {
+	go func() {
+		ticker := time.NewTicker(duration / 2)
+		defer ticker.Stop()
+
+		for {
+			<-ticker.C
+
+			bi.mu.Lock()
+			timeSinceLastSend := time.Since(bi._lastSent)
+			pendingOps := bi.pendingOperations.Load()
+			bi.mu.Unlock()
+
+			if pendingOps > 0 && timeSinceLastSend >= duration {
+				bi.flush()
+			}
+		}
+	}()
 }
 
 func (bi *BulkIndexer) flush() {
@@ -50,5 +76,7 @@ func (bi *BulkIndexer) flush() {
 		return
 	}
 
+	bi._lastSent = time.Now()
+	bi.pendingOperations.Store(int64(0))
 	bi._queue = bi._queue[:0]
 }

@@ -48,10 +48,25 @@ func Start() error {
 			}
 		}()
 	}
-
-	// Load Processors
-	//if err = LoadAllProcessors(); err != nil {
-	//	return err
+	//
+	//var processorsWg sync.WaitGroup
+	//var processorErrChan = make(chan error)
+	//
+	//for _, p := range GetProcessors() {
+	//	//if !p.Enabled {
+	//	//	continue
+	//	//}
+	//	processorsWg.Add(1)
+	//	go func() {
+	//		defer func() {
+	//			processorsWg.Done()
+	//			fmt.Println("processor stopped")
+	//		}()
+	//		err := p.Start()
+	//		if err != nil && !errors.Is(err, context.Canceled) {
+	//			processorErrChan <- err
+	//		}
+	//	}()
 	//}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -60,37 +75,21 @@ func Start() error {
 	select {
 	case <-ctx.Done():
 		fmt.Println("TODO GRACEFULL SHUTDOWN")
+	//case err := <-processorErrChan:
+	//	return err
 	case err := <-moduleErrChan:
 		return err
 	}
 
+	// STOP ALL PROCESSORS
+	for _, p := range GetProcessors() {
+		err := p.Stop()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	//processorsWg.Wait()
+
 	return nil
-}
-
-func (app *App) Reload() error {
-	panic("not implemented")
-}
-
-func (app *App) IndexProcessor() error {
-	panic("not implemented")
-}
-
-func (app *App) AddProcessor() error {
-	panic("not implemented")
-}
-
-func (app *App) GetProcessor(id int) error {
-	panic("not implemented")
-}
-
-func (app *App) GetProcessors(id int) error {
-	panic("not implemented")
-}
-
-func (app *App) LoadConfig() error {
-	panic("not implemented")
-}
-
-func (app *App) SaveConfig() error {
-	panic("not implemented")
 }

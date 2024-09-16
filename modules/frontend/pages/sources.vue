@@ -48,7 +48,9 @@
 </template>
 
 <script setup lang="ts">
+
 const {status, data: sources, refresh} = useSources()
+
 
 const columns = [
   {key: 'id', label: '#', sortable: true, rowClass: 'w-[1px] whitespace-nowrap'},

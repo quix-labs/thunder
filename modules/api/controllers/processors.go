@@ -24,16 +24,17 @@ func ProcessorRoutes(mux *http.ServeMux) {
 }
 
 type ProcessorApiDetails struct {
-	Status      thunder.ProcessorStatus `json:"status"`
-	ID          int                     `json:"id"`
-	Source      int                     `json:"source"`  // as source_id
-	Targets     []int                   `json:"targets"` // as targets_id
-	Table       string                  `json:"table"`
-	PrimaryKeys []string                `json:"primary_keys"`
-	Conditions  []thunder.Condition     `json:"conditions"`
-	Mapping     thunder.Mapping         `json:"mapping"`
-	Index       string                  `json:"index"`
-	Enabled     bool                    `json:"enabled"`
+	Indexing    bool                `json:"indexing"`
+	Listening   bool                `json:"listening"`
+	ID          int                 `json:"id"`
+	Source      int                 `json:"source"`  // as source_id
+	Targets     []int               `json:"targets"` // as targets_id
+	Table       string              `json:"table"`
+	PrimaryKeys []string            `json:"primary_keys"`
+	Conditions  []thunder.Condition `json:"conditions"`
+	Mapping     thunder.Mapping     `json:"mapping"`
+	Index       string              `json:"index"`
+	Enabled     bool                `json:"enabled"`
 }
 
 func listProcessors(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +47,9 @@ func listProcessors(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		res = append(res, ProcessorApiDetails{
-			Status:      processor.Status,
+			Indexing:  processor.Indexing.Load(),
+			Listening: processor.Listening.Load(),
+
 			ID:          serializedProcessor.ID,
 			Source:      serializedProcessor.Source,
 			Targets:     serializedProcessor.Targets,

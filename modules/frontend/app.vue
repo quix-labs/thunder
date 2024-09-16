@@ -8,3 +8,7 @@
     <UNotifications :ui="{  position: 'start-1/2 -translate-x-1/2'}"/>
   </div>
 </template>
+
+<script setup lang="ts">
+injectWebhookListener()
+</script>

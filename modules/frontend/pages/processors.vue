@@ -48,9 +48,11 @@
               <UBadge size="xs" :label="`${row.stats.conditions} conditions`" color="gray"/>
             </div>
           </template>
-          <template #status-data="{ row }">
-            <UBadge size="xs" :label="row.status"
-                    :color="{listening:'green',inactive:'red',indexing:'sky'}[row.status] || 'gray'"/>
+          <template #indexing-data="{ row }">
+            <UBadge size="xs" :label="row.indexing?'Indexing':'Not indexing'" :color="row.indexing?'green':'red'"/>
+          </template>
+          <template #listening-data="{ row }">
+            <UBadge size="xs" :label="row.listening?'Listening':'Not listening'" :color="row.listening?'green':'red'"/>
           </template>
         </UTable>
       </template>
@@ -59,36 +61,14 @@
         <span>{{ rows?.length || 0 }}&nbsp;processors</span>
       </template>
     </UCard>
-
-    <ProcessorFormComplete
-        @updated="refresh"
-        @created="refresh"
-        :mode="formMode"
-        v-model:opened="formOpened"
-        :processor="formProcessor"
-    />
+    <ProcessorFormComplete :mode="formMode" v-model:opened="formOpened" :processor="formProcessor"/>
   </section>
 
 </template>
 
 <script setup lang="ts">
 
-const {status, data: processors, refresh} = useProcessors()
-
-
-onMounted(() => {
-  const {on} = useEvents()
-  on('processor-updated', () => {
-    refresh()
-  })
-  on('processor-indexed', (processorId) => {
-    useToast().add({
-      color: "green",
-      title: `Processor ${processorId} indexed`,
-    })
-  })
-})
-
+const {status, data: processors} = useProcessors()
 
 // Table
 const columns = [
@@ -97,7 +77,8 @@ const columns = [
   {key: 'index', label: 'Index', sortable: true},
   {key: 'targets', label: 'Targets', sortable: false},
   {key: 'stats', label: 'Stats', sortable: false},
-  {key: 'status', label: 'Status', sortable: false},
+  {key: 'listening', label: 'Listening', sortable: false},
+  {key: 'indexing', label: 'Indexing', sortable: false},
   {key: 'actions', sortable: false, rowClass: 'w-[1px] whitespace-nowrap'}
 ]
 
@@ -110,7 +91,8 @@ const rows = computed(() => processors.value?.map(processor => ({
     conditions: processor.conditions?.length || 0,
     ...getMappingStats(processor.mapping || [])
   },
-  status: processor.status || '---',
+  indexing: processor.indexing || false,
+  listening: processor.listening || false,
 })) || [])
 
 const getMappingStats = (mapping: any[]) => {
@@ -162,7 +144,6 @@ const deleteProcessor = async (id: number) => {
     const serverData = data.value as { message?: string }
     useToast().add({color: "green", title: "Successfully deleted processor", description: serverData.message})
   }
-  await refresh()
 }
 
 const claimIndexing = (id: number) => {

@@ -1,12 +1,15 @@
 package elastic
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"errors"
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 	"github.com/quix-labs/thunder"
+	"time"
 )
 
 func init() {
@@ -48,19 +51,56 @@ func (d *Driver) TestConfig() (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	return fmt.Sprintf(`successfully connected, cluster: "%s"`, res.ClusterName), nil
 }
 
-func (d *Driver) IndexDocumentsForProcessor(processor *thunder.Processor, docChan <-chan *thunder.Document, errChan chan error) {
+func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan thunder.Event, ctx context.Context) error {
 	bulkIndexer := NewBulkIndexer(d.client, d.config.BatchSize)
-	for doc := range docChan {
-		bulkIndexer.Add(
-			[]byte(`{"index":{"_index":"`+d.config.Prefix+processor.Index+`","_id":"`+GetPrimaryKeysAsString(doc.PrimaryKeys)+`"}}`),
-			doc.Json,
-		)
+	defer bulkIndexer.Close()
+	bulkIndexer.AddSendTimeout(time.Second * time.Duration(d.config.ReactivityInterval))
+
+	// Defer flush index
+	defer func() {
+		_, _ = d.client.Indices.Flush().Index(processor.Index).Do(context.Background())
+	}()
+
+	index := d.config.Prefix + processor.Index
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+
+		case event := <-eventsChan:
+			switch typedEvent := event.(type) {
+			case *thunder.InsertEvent:
+				bulkIndexer.Add(
+					[]byte(`{"index":{"_index":"`+index+`","_id":"`+GetPrimaryKeysAsString(typedEvent.PrimaryKeys)+`"}}`),
+					typedEvent.Json,
+				)
+				break
+			case *thunder.PatchEvent:
+				//TODO PATH
+				bulkIndexer.Add(
+					[]byte(`{"update":{"_index":"`+index+`","_id":"`+GetPrimaryKeysAsString(typedEvent.PrimaryKeys)+`"}}`),
+					bytes.Join([][]byte{[]byte(`{"doc":`), typedEvent.JsonPatch, []byte("}")}, []byte("")),
+				)
+			case *thunder.DeleteEvent:
+				bulkIndexer.Add(
+					[]byte(`{"delete":{"_index":"` + index + `","_id":"` + GetPrimaryKeysAsString(typedEvent.PrimaryKeys) + `"}}`),
+				)
+			case *thunder.TruncateEvent:
+				// not supported by bulk
+				_, err := d.client.DeleteByQuery(index).
+					Query(&types.Query{MatchAll: &types.MatchAllQuery{}}).
+					Do(context.Background())
+				if err != nil {
+					return err
+				}
+			default:
+				return fmt.Errorf("unsupported event type received: %T", typedEvent)
+			}
+		}
 	}
-	bulkIndexer.Close()
 }
 
 func (d *Driver) Shutdown() error {

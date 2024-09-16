@@ -40,7 +40,6 @@ func SerializeProcessor(s *Processor) (*JsonProcessor, error) {
 func UnserializeProcessor(jp *JsonProcessor) (*Processor, error) {
 	p := Processor{
 		ID:          jp.ID,
-		Status:      ProcessorInactive,
 		Table:       jp.Table,
 		PrimaryKeys: jp.PrimaryKeys,
 		Conditions:  jp.Conditions,

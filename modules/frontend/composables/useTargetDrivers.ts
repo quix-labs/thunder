@@ -19,6 +19,4 @@ export type TargetDrivers = {
     [key: string]: TargetDriver
 }
 
-export default function useTargetDrivers() {
-    return useGoFetch<TargetDrivers>('/target-drivers')
-}
+export default () => useGoLazyAsyncData<TargetDrivers>('target-drivers', '/target-drivers')

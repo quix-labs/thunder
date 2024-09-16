@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/quix-labs/thunder"
 	"math/rand"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -239,4 +240,64 @@ func GetResultsInChan[T any](conn *pgx.Conn, query string, withIntermediateView 
 		}
 		resultsChan <- &document
 	}
+}
+
+func ExtractKeysFromMapAsSlice[T any](keys []string, target map[string]any) ([]T, error) {
+	var result = make([]T, len(keys))
+
+	targetType := reflect.TypeOf((*T)(nil)).Elem()
+
+	for idx, key := range keys {
+		value, exists := target[key]
+		if !exists {
+			return nil, fmt.Errorf("key %s does not exist", key)
+		}
+
+		val := reflect.ValueOf(value)
+
+		if targetType.Kind() == reflect.String {
+			switch val.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				convertedValue := strconv.FormatInt(val.Int(), 10) // Conversion des types entiers signés en string
+				result[idx] = any(convertedValue).(T)
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				convertedValue := strconv.FormatUint(val.Uint(), 10) // Conversion des types entiers non signés en string
+				result[idx] = any(convertedValue).(T)
+			case reflect.Float32, reflect.Float64:
+				convertedValue := strconv.FormatFloat(val.Float(), 'f', -1, 64) // Conversion des types flottants en string
+				result[idx] = any(convertedValue).(T)
+			default:
+				if val.Type().ConvertibleTo(targetType) {
+					convertedValue := val.Convert(targetType).Interface()
+					result[idx] = convertedValue.(T)
+				} else {
+					return nil, fmt.Errorf("value for key %s cannot be converted to type %T", key, result[idx])
+				}
+			}
+		} else if val.Type().ConvertibleTo(targetType) {
+			convertedValue := val.Convert(targetType).Interface()
+			result[idx] = convertedValue.(T)
+		} else {
+			return nil, fmt.Errorf("value for key %s cannot be converted to type %T", key, result[idx])
+		}
+	}
+
+	return result, nil
+}
+
+func MapDiff(map1 map[string]any, map2 map[string]any) map[string]any {
+	diff := make(map[string]any)
+	for k, v1 := range map1 {
+		if v2, ok := map2[k]; ok {
+			if v1 != v2 {
+				diff[k] = v2
+			}
+		}
+	}
+	for k, v2 := range map2 {
+		if _, ok := map1[k]; !ok {
+			diff[k] = v2
+		}
+	}
+	return diff
 }

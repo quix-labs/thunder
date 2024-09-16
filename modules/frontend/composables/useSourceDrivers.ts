@@ -1,6 +1,3 @@
-import useGoFetch from "./useGoFetch";
-
-
 export type Driver = {
     config: {
         name: string
@@ -20,6 +17,5 @@ export type SourceDrivers = {
     [key: string]: Driver
 }
 
-export default function useSourceDrivers() {
-    return useGoFetch<SourceDrivers>('/source-drivers')
-}
+
+export default () => useGoLazyAsyncData<SourceDrivers>('source-drivers', '/source-drivers')

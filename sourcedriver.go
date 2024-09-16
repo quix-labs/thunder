@@ -1,6 +1,7 @@
 package thunder
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/creasty/defaults"
 	"reflect"
@@ -33,10 +34,10 @@ type SourceDriver interface {
 
 	GetDocumentsForProcessor(processor *Processor, docChan chan<- *Document, errChan chan error, limit uint64)
 
-	Start() error
-	Stop() error
+	// Real Time Indexing
 
-	Shutdown() error
+	Start(processor *Processor, eventsChan chan<- Event, ctx context.Context) error
+	Stop() error
 }
 
 // UTILITIES FUNCTIONS

@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"encoding/json"
-	"github.com/quix-labs/thunder"
 	"log"
 	"net/http"
 )
@@ -43,13 +42,4 @@ func writeJsonError(w http.ResponseWriter, statusCode int, error error, message 
 	if err != nil {
 		log.Println(err)
 	}
-}
-
-func GetProcessorStatus() map[int]thunder.ProcessorStatus {
-	processorsStates := thunder.GetProcessors()
-	var response = make(map[int]thunder.ProcessorStatus, len(processorsStates))
-	for idx, processor := range processorsStates {
-		response[idx] = processor.Status
-	}
-	return response
 }

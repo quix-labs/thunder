@@ -7,11 +7,12 @@ import (
 )
 
 type DriverConfig struct {
-	Endpoint  string `type:"url" required:"true" default:"http://localhost:9200"`
-	Username  string
-	Password  string `type:"password"`
-	BatchSize int    `type:"number" label:"Batch size" default:"100" min:"1" help:"Use 1 to disable batching (not recommended)"`
-	Prefix    string
+	Endpoint           string `type:"url" required:"true" default:"http://localhost:9200"`
+	Username           string
+	Password           string `type:"password"`
+	BatchSize          int    `type:"number" label:"Batch size" default:"100" min:"1" help:"Use 1 to disable batching (not recommended)"`
+	ReactivityInterval int    `type:"number" label:"Reactivity Interval (in sec)" default:"10" min:"1" help:"Max time without data before flushing changes to the index"`
+	Prefix             string
 }
 
 func (cfg DriverConfig) Excerpt() string {

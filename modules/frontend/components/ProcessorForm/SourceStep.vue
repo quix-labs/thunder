@@ -106,18 +106,18 @@
   </section>
 </template>
 <script setup lang="ts">
+import {type Stats} from "~/composables/useSourceStats";
 
 const form = defineModel<any>('form', {required: true})
 const {data: sources, refresh} = useSources()
 
-type Stats = { [key: string]: { columns: string[], primary_keys: string[] } };
 const availableTables = ref<Stats>({});
 
 
 const computeAvailableTables = async () => {
   if (form.value.source === null) return;
 
-  const {data, status, error} = await useGoFetch<Stats>(`/sources/${form.value.source}/stats`);
+  const {data, status, error} = await useSourceStats(form.value.source);
 
   availableTables.value = data.value || {};
 

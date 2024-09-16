@@ -180,6 +180,8 @@
 
 <script setup lang="ts">
 
+import useSourceStats from "~/composables/useSourceStats";
+
 const mapping = defineModel<any>({required: false, default: []})
 const props = defineProps<{
   source: number,
@@ -187,7 +189,7 @@ const props = defineProps<{
   path?: string,
 }>()
 
-const {data: stats, status, error} = await useGoFetch<any>(`/sources/${props.source}/stats`);
+const {data: stats, status, error} = await useSourceStats(props.source);
 //TODO ERROR HANDLING
 
 const manualSimpleFields = ref<string[]>([])

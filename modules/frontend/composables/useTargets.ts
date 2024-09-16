@@ -1,4 +1,1 @@
-
-export default function useTargets() {
-    return useGoFetch<any>('/targets')
-}
+export default () => useGoLazyAsyncData('targets', '/targets')
