@@ -122,15 +122,70 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 				}
 
 			case *thunder.TargetDeleteEvent:
-				bulkIndexer.Add(
-					[]byte(`{"delete":{"_index":"` + index + `","_id":"` + SanitizeJsonString(typedEvent.Pkey) + `"}}`),
-				)
-			case *thunder.TargetTruncateEvent:
-				// not supported by bulk
-				_, err := d.client.DeleteByQuery(index).
-					Query(&types.Query{MatchAll: &types.MatchAllQuery{}}).
-					Do(context.Background())
+				// Handle base table delete
+				if typedEvent.Path == "" {
+					bulkIndexer.Add(
+						[]byte(`{"delete":{"_index":"` + index + `","_id":"` + SanitizeJsonString(typedEvent.Pkey) + `"}}`),
+					)
+					continue
+				}
+
+				// Handle relation delete
+				reqBody := fmt.Sprintf(`{
+					"script": {"source": "if (ctx._source.%s != null) { ctx._source.%s = null; }"},
+					"query": {"match": {"%s._pkey":"%s"}}
+				}`, typedEvent.Path, typedEvent.Path, typedEvent.Path, SanitizeJsonString(typedEvent.Pkey))
+
+				//TODO MANY TO MANY ARRAY
+
+				var refresh = true // IMPORTANT TO AVOID BURST 409
+				req := esapi.UpdateByQueryRequest{Index: []string{index},
+					Refresh: &refresh,
+					Body:    strings.NewReader(reqBody),
+				}
+
+				res, err := req.Do(ctx, d.client)
 				if err != nil {
+					return err
+				}
+
+				if err = res.Body.Close(); err != nil {
+					return err
+				}
+
+			case *thunder.TargetTruncateEvent:
+				// Handle base table truncate
+				if typedEvent.Path == "" {
+					res, err := d.client.DeleteByQuery(index).
+						Query(&types.Query{MatchAll: &types.MatchAllQuery{}}).
+						Refresh(true). // IMPORTANT TO AVOID BURST 409
+						Do(context.Background())
+					if err != nil {
+						fmt.Println(err)
+						return err
+					}
+					fmt.Println(res.Deleted)
+					continue
+				}
+
+				// Handle relation truncate
+				reqBody := fmt.Sprintf(`{
+					"script": {"source": "if (ctx._source.%s != null) { ctx._source.%s = null; }"},
+					"query": {"exists": {"field": "%s._pkey"}}
+				}`, typedEvent.Path, typedEvent.Path, typedEvent.Path)
+
+				var refresh = true // IMPORTANT TO AVOID BURST 409
+				req := esapi.UpdateByQueryRequest{Index: []string{index},
+					Refresh: &refresh,
+					Body:    strings.NewReader(reqBody),
+				}
+
+				res, err := req.Do(ctx, d.client)
+				if err != nil {
+					return err
+				}
+
+				if err = res.Body.Close(); err != nil {
 					return err
 				}
 			default:

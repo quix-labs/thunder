@@ -38,9 +38,12 @@ type TargetPatchEvent struct {
 }
 
 type TargetDeleteEvent struct {
+	Path string
 	Pkey string
 }
 
-type TargetTruncateEvent struct{}
+type TargetTruncateEvent struct {
+	Path string
+}
 
 type TargetEvent any // TargetDeleteEvent | TargetInsertEvent | TargetPatchEvent | TargetTruncateEvent

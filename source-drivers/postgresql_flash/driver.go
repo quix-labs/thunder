@@ -197,36 +197,51 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 			}
 			flashClient.Attach(listener)
 			continue
-		} else {
-			_, err = listener.On(flash.OperationUpdate, func(event flash.Event) {
-				switch typedEvent := event.(type) {
-				case *flash.UpdateEvent:
-					pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.Old)
-					if err != nil {
-						listenerErrChan <- err
-						return
-					}
-					jsonPatch, err := json.Marshal(MapDiff(*typedEvent.Old, *typedEvent.New))
-					if err != nil {
-						listenerErrChan <- err
-						return
-					}
-					eventsChan <- &thunder.DbPatchEvent{
-						Path:      path,
-						Pkey:      pkey,
-						JsonPatch: jsonPatch,
-					}
-				}
-			})
-			if err != nil {
-				return err
-			}
-			flashClient.Attach(listener)
 		}
 
-		// Handle relations changes
-		//TODO
+		// HANDLE RELATION EVENTS
+		_, err = listener.On(flash.OperationUpdate^flash.OperationTruncate^flash.OperationDelete, func(event flash.Event) {
+			switch typedEvent := event.(type) {
+			case *flash.UpdateEvent:
+				pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.Old)
+				if err != nil {
+					listenerErrChan <- err
+					return
+				}
+				jsonPatch, err := json.Marshal(MapDiff(*typedEvent.Old, *typedEvent.New))
+				if err != nil {
+					listenerErrChan <- err
+					return
+				}
+				eventsChan <- &thunder.DbPatchEvent{
+					Path:      path,
+					Pkey:      pkey,
+					JsonPatch: jsonPatch,
+				}
 
+			case *flash.TruncateEvent:
+				eventsChan <- &thunder.DbTruncateEvent{
+					Path: path,
+				}
+
+			case *flash.DeleteEvent:
+				pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.Old)
+				if err != nil {
+					listenerErrChan <- err
+					return
+				}
+
+				eventsChan <- &thunder.DbDeleteEvent{
+					Path: path,
+					Pkey: pkey,
+				}
+			}
+
+		})
+		if err != nil {
+			return err
+		}
+		flashClient.Attach(listener)
 	}
 
 	// START IN BACKGROUND

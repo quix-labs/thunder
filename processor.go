@@ -105,10 +105,13 @@ func (p *Processor) Start() error {
 				case *DbDeleteEvent:
 					channel <- &TargetDeleteEvent{
 						Pkey: typedEvent.Pkey,
+						Path: typedEvent.Path,
 					}
 
 				case *DbTruncateEvent:
-					channel <- &TargetTruncateEvent{}
+					channel <- &TargetTruncateEvent{
+						Path: typedEvent.Path,
+					}
 				}
 
 			}

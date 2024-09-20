@@ -54,10 +54,13 @@ type DbPatchEvent struct {
 }
 
 type DbDeleteEvent struct {
+	Path string
 	Pkey string
 }
 
-type DbTruncateEvent struct{}
+type DbTruncateEvent struct {
+	Path string
+}
 
 type DbEvent any // DbDeleteEvent | DbInsertEvent | DbPatchEvent | DbTruncateEvent
 
