@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 	"github.com/quix-labs/thunder"
+	"strings"
 	"time"
 )
 
@@ -54,7 +56,7 @@ func (d *Driver) TestConfig() (string, error) {
 	return fmt.Sprintf(`successfully connected, cluster: "%s"`, res.ClusterName), nil
 }
 
-func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan thunder.Event, ctx context.Context) error {
+func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan thunder.TargetEvent, ctx context.Context) error {
 	bulkIndexer := NewBulkIndexer(d.client, d.config.BatchSize)
 	defer bulkIndexer.Close()
 	bulkIndexer.AddSendTimeout(time.Second * time.Duration(d.config.ReactivityInterval))
@@ -72,23 +74,58 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 
 		case event := <-eventsChan:
 			switch typedEvent := event.(type) {
-			case *thunder.InsertEvent:
+			case *thunder.TargetInsertEvent:
 				bulkIndexer.Add(
-					[]byte(`{"index":{"_index":"`+index+`","_id":"`+GetPrimaryKeysAsString(typedEvent.PrimaryKeys)+`"}}`),
+					[]byte(`{"index":{"_index":"`+index+`","_id":"`+SanitizeJsonString(typedEvent.Pkey)+`"}}`),
 					typedEvent.Json,
 				)
 				break
-			case *thunder.PatchEvent:
-				//TODO PATH
+			case *thunder.TargetPatchEvent:
+				// Handle base table update
+				if typedEvent.Path == "" {
+					bulkIndexer.Add(
+						[]byte(`{"update":{"_index":"`+index+`","_id":"`+SanitizeJsonString(typedEvent.Pkey)+`"}}`),
+						bytes.Join([][]byte{[]byte(`{"doc":`), typedEvent.JsonPatch, []byte("}")}, []byte("")),
+					)
+					continue
+				}
+
+				// Handle relation patch
+				reqBody := fmt.Sprintf(`
+    {
+        "script": {
+            "source": "for (entry in params.patch.entrySet()) { ctx._source.%s[entry.getKey()] = entry.getValue(); }",
+            "params": {
+                "patch": %s
+            }
+        },
+        "query": {
+            "match": {
+                "%s._pkey": "%s" 
+            }
+        }
+    }`, typedEvent.Path, typedEvent.JsonPatch, typedEvent.Path, SanitizeJsonString(typedEvent.Pkey))
+				//TODO MANY TO MANY ARRAY
+				//"source": "for (int i = 0; i < ctx._source.%s.length; i++) { if (ctx._source.%s[i].author == params.oldAuthor) { ctx._source.%s[i].author = params.newAuthor; } }",
+
+				req := esapi.UpdateByQueryRequest{
+					Index: []string{index},
+					Body:  strings.NewReader(reqBody),
+				}
+
+				res, err := req.Do(ctx, d.client)
+				if err != nil {
+					return err
+				}
+				if err = res.Body.Close(); err != nil {
+					return err
+				}
+
+			case *thunder.TargetDeleteEvent:
 				bulkIndexer.Add(
-					[]byte(`{"update":{"_index":"`+index+`","_id":"`+GetPrimaryKeysAsString(typedEvent.PrimaryKeys)+`"}}`),
-					bytes.Join([][]byte{[]byte(`{"doc":`), typedEvent.JsonPatch, []byte("}")}, []byte("")),
+					[]byte(`{"delete":{"_index":"` + index + `","_id":"` + SanitizeJsonString(typedEvent.Pkey) + `"}}`),
 				)
-			case *thunder.DeleteEvent:
-				bulkIndexer.Add(
-					[]byte(`{"delete":{"_index":"` + index + `","_id":"` + GetPrimaryKeysAsString(typedEvent.PrimaryKeys) + `"}}`),
-				)
-			case *thunder.TruncateEvent:
+			case *thunder.TargetTruncateEvent:
 				// not supported by bulk
 				_, err := d.client.DeleteByQuery(index).
 					Query(&types.Query{MatchAll: &types.MatchAllQuery{}}).

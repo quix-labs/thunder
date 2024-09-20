@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/quix-labs/thunder"
@@ -101,13 +100,8 @@ func testProcessor(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		keyBytes, err := json.Marshal(doc.PrimaryKeys)
-		if err != nil {
-			writeJsonError(w, http.StatusInternalServerError, err, "")
-			return
-		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprintf(`{"primary_keys":%s,"document":%s}`, keyBytes, doc.Json)))
+		w.Write(doc.Json)
 		return
 	case err := <-errChan:
 		writeJsonError(w, http.StatusInternalServerError, err, "")

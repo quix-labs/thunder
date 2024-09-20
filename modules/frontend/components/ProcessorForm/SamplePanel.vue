@@ -28,13 +28,13 @@
       <div v-else-if="status==='success'">
         <p class="mx-4 mb-4 ">
           <span class="font-semibold">Document primary keys:</span>
-          [{{ data?.primary_keys?.join(', ') }}]
+          {{JSON.parse(data?._pkey)}}
         </p>
         <VueJsonPretty
             show-icon
             show-length
             show-line-number
-            :data="data.document" :theme="useColorMode().value"/>
+            :data="data" :theme="useColorMode().value"/>
       </div>
 
       <div v-else-if="status==='error'" class=" text-red-600 flex flex-col gap-y-2 items-center ">

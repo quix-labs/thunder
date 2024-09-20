@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v5"
 	"github.com/quix-labs/flash"
-	"github.com/quix-labs/flash/drivers/trigger"
+	"github.com/quix-labs/flash/drivers/wal_logical"
+	_ "github.com/quix-labs/flash/drivers/wal_logical"
 	"github.com/quix-labs/thunder"
 	"strconv"
 	"time"
@@ -99,49 +100,48 @@ func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, docChan 
 	GetResultsInChan[thunder.Document](conn, query, false, docChan, errChan)
 }
 
-func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.Event, ctx context.Context) error {
-	//
+func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, ctx context.Context) error {
+
 	publicationSlotPrefix := "thunder_p" + strconv.Itoa(p.ID)
-	//replicationSlot := "thunder_replication_p" + strconv.Itoa(p.ID)
-	//
-	//conn, err := d.newConn()
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//// DROP PREVIOUS REPLICATION SLOT (fix flash bad closing)
-	//if _, err := conn.Exec(context.Background(), fmt.Sprintf("select pg_drop_replication_slot(slot_name) from pg_replication_slots where slot_name = '%s'", replicationSlot)); err != nil {
-	//	return err
-	//}
-	//// DROP PREVIOUS PUBLICATION SLOT (fix flash bad closing)
-	//query := fmt.Sprintf(`
-	//DO $$
-	//	DECLARE
-	//		r RECORD;
-	//	BEGIN
-	//		FOR r IN (SELECT pubname FROM pg_publication WHERE pubname LIKE '%s%%') LOOP
-	//			EXECUTE 'DROP PUBLICATION ' || quote_ident(r.pubname);
-	//		END LOOP;
-	//	END $$;`, publicationSlotPrefix)
-	//
-	//if _, err := conn.Exec(context.Background(), query); err != nil {
-	//	return err
-	//}
-	//if err := conn.Close(context.Background()); err != nil {
-	//	return err
-	//}
+	replicationSlot := "thunder_replication_p" + strconv.Itoa(p.ID)
+
+	conn, err := d.newConn()
+	if err != nil {
+		return err
+	}
+
+	// DROP PREVIOUS REPLICATION SLOT (fix flash bad closing)
+	if _, err := conn.Exec(context.Background(), fmt.Sprintf("select pg_drop_replication_slot(slot_name) from pg_replication_slots where slot_name = '%s'", replicationSlot)); err != nil {
+		return err
+	}
+	// DROP PREVIOUS PUBLICATION SLOT (fix flash bad closing)
+	query := fmt.Sprintf(`
+	DO $$
+		DECLARE
+			r RECORD;
+		BEGIN
+			FOR r IN (SELECT pubname FROM pg_publication WHERE pubname LIKE '%s%%') LOOP
+				EXECUTE 'DROP PUBLICATION ' || quote_ident(r.pubname);
+			END LOOP;
+		END $$;`, publicationSlotPrefix)
+
+	if _, err := conn.Exec(context.Background(), query); err != nil {
+		return err
+	}
+	if err := conn.Close(context.Background()); err != nil {
+		return err
+	}
 
 	// START LISTENING
 	flashClient, _ := flash.NewClient(&flash.ClientConfig{
 		DatabaseCnx: "postgresql://devuser:devpass@localhost:5432/devdb",
-		//Driver: wal_logical.NewDriver(&wal_logical.DriverConfig{
-		//	PublicationSlotPrefix: publicationSlotPrefix,
-		//	ReplicationSlot:       replicationSlot,
-		//	//Schema: d.config.Schema,
-		//}),
-		Driver: trigger.NewDriver(&trigger.DriverConfig{
-			Schema: publicationSlotPrefix,
+		Driver: wal_logical.NewDriver(&wal_logical.DriverConfig{
+			PublicationSlotPrefix: publicationSlotPrefix,
+			ReplicationSlot:       replicationSlot,
 		}),
+		//Driver: trigger.NewDriver(&trigger.DriverConfig{
+		//	Schema: publicationSlotPrefix,
+		//}),
 	})
 
 	// Register all listener
@@ -157,16 +157,20 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.Event, ct
 		if err != nil {
 			return err
 		}
-
 		// Handle root table changes
 		if path == "" {
 			// TODO OFF GRACEFULL SHUTDOWN
 			_, err = listener.On(flash.OperationAll, func(event flash.Event) {
 				switch typedEvent := event.(type) {
 				case *flash.InsertEvent:
-					fmt.Printf("%s -  insert - new: %+v\n", path, typedEvent.New)
+					pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.New)
+					if err != nil {
+						listenerErrChan <- err
+						return
+					}
+					eventsChan <- &thunder.DbInsertEvent{Pkey: pkey}
 				case *flash.UpdateEvent:
-					primaryKeys, err := ExtractKeysFromMapAsSlice[string](config.PrimaryKeys, *typedEvent.Old)
+					pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.Old)
 					if err != nil {
 						listenerErrChan <- err
 						return
@@ -176,16 +180,16 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.Event, ct
 						listenerErrChan <- err
 						return
 					}
-					eventsChan <- &thunder.PatchEvent{PrimaryKeys: primaryKeys, JsonPatch: jsonPatch}
+					eventsChan <- &thunder.DbPatchEvent{Pkey: pkey, JsonPatch: jsonPatch}
 				case *flash.DeleteEvent:
-					primaryKeys, err := ExtractKeysFromMapAsSlice[string](config.PrimaryKeys, *typedEvent.Old)
+					pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.Old)
 					if err != nil {
 						listenerErrChan <- err
 						return
 					}
-					eventsChan <- &thunder.DeleteEvent{PrimaryKeys: primaryKeys}
+					eventsChan <- &thunder.DbDeleteEvent{Pkey: pkey}
 				case *flash.TruncateEvent:
-					eventsChan <- &thunder.TruncateEvent{}
+					eventsChan <- &thunder.DbTruncateEvent{}
 				}
 			})
 			if err != nil {
@@ -193,6 +197,31 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.Event, ct
 			}
 			flashClient.Attach(listener)
 			continue
+		} else {
+			_, err = listener.On(flash.OperationUpdate, func(event flash.Event) {
+				switch typedEvent := event.(type) {
+				case *flash.UpdateEvent:
+					pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.Old)
+					if err != nil {
+						listenerErrChan <- err
+						return
+					}
+					jsonPatch, err := json.Marshal(MapDiff(*typedEvent.Old, *typedEvent.New))
+					if err != nil {
+						listenerErrChan <- err
+						return
+					}
+					eventsChan <- &thunder.DbPatchEvent{
+						Path:      path,
+						Pkey:      pkey,
+						JsonPatch: jsonPatch,
+					}
+				}
+			})
+			if err != nil {
+				return err
+			}
+			flashClient.Attach(listener)
 		}
 
 		// Handle relations changes

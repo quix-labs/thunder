@@ -41,7 +41,6 @@ Contributions and feedback are welcome!
 
 ## Installation
 
-
 ### Using Docker
 
 - Pull the Docker image from the GitHub Container Registry:
@@ -52,13 +51,13 @@ Contributions and feedback are welcome!
   ```bash
   docker run -p 3000:3000 -v "./config.json:/config.json"  --name thunder ghcr.io/quix-labs/thunder:latest
   ```
-  
+
 ### Using prebuilt assets
 
 You can also install the tool using release assets such as `.deb`, `.apk`, or others.
 
-Download the appropriate package from the [Releases page](https://github.com/quix-labs/thunder/releases), and then follow the instructions provided for your specific platform.
-
+Download the appropriate package from the [Releases page](https://github.com/quix-labs/thunder/releases), and then
+follow the instructions provided for your specific platform.
 
 ### Using go (build from source as library)
 
@@ -142,6 +141,17 @@ Go to `/processors` to configure them
 Targets define your indexer connections
 
 Go to `/targets` to configure them
+
+## Realtime compatibility Table
+
+|   Target table   | Insert | Update | Delete | Truncate |
+|:----------------:|:------:|:------:|:------:|:--------:|
+|    Base table    |  ❌ ◀   |   ✅    |   ✅    |    ✅     |
+|    one_to_one    |  N/A   |   ✅    |  ❌  ⏳  |   ❌  ⏳   |
+|     has-many     |  ❌ ⏳   |  ❌ ⏳   |  ❌  ⏳  |   ❌  ⏳   |
+| has-many (pivot) |  ❌ ◀   |  ❌ ◀   |  ❌  ⏳  |  ❌   ⏳   |
+
+- ◀: `Need to send select request (impact DB)`
 
 ## Contributing
 

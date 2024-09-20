@@ -29,7 +29,7 @@ func GetSqlForProcessor(processor *thunder.Processor) (string, error) {
 	query := goqu.Dialect("postgres").From(goqu.T(processor.Table))
 
 	var mappingJoins joins
-	resultExpr, err := processMapping(processor.Table, &processor.Mapping, &mappingJoins, false)
+	resultExpr, err := processMapping(processor.Table, &processor.Mapping, &mappingJoins, false, processor.PrimaryKeys)
 	if err != nil {
 		return "", err
 	}
@@ -74,14 +74,14 @@ func GetSqlForProcessor(processor *thunder.Processor) (string, error) {
 		bindings = append(bindings, "?")
 	}
 	query = query.SelectAppend(
-		goqu.L(fmt.Sprintf("ARRAY[%s]::text[]", strings.Join(bindings, ",")), args...).As("PrimaryKeys"),
+		goqu.L("?::TEXT", goqu.Func("to_json", goqu.L(fmt.Sprintf("ARRAY[%s]::text[]", strings.Join(bindings, ",")), args...))).As("Pkey"),
 	)
 
 	sql, _, _ := query.ToSQL()
 	return sql, nil
 }
 
-func processMapping(tableAlias string, mapping *thunder.Mapping, mappingJoins *joins, aggregate bool) (exp.Aliaseable, error) {
+func processMapping(tableAlias string, mapping *thunder.Mapping, mappingJoins *joins, aggregate bool, primaryKeys []string) (exp.Aliaseable, error) {
 	var jsonSubSelects []any
 
 	for _, field := range *mapping {
@@ -96,7 +96,7 @@ func processMapping(tableAlias string, mapping *thunder.Mapping, mappingJoins *j
 
 		if field.FieldType == "relation" {
 			var relationJoins joins
-			relationExpr, err := processMapping(field.Table, &field.Mapping, &relationJoins, field.Type == "has-many")
+			relationExpr, err := processMapping(field.Table, &field.Mapping, &relationJoins, field.Type == "has-many", field.PrimaryKeys)
 			if err != nil {
 				return nil, err
 			}
@@ -136,6 +136,18 @@ func processMapping(tableAlias string, mapping *thunder.Mapping, mappingJoins *j
 		}
 	}
 
+	// Append primary key columns
+	var args []any
+	var bindings []string
+	for _, primaryColumn := range primaryKeys {
+		args = append(args, goqu.I(tableAlias+"."+primaryColumn))
+		bindings = append(bindings, "?")
+	}
+	jsonSubSelects = append(jsonSubSelects,
+		goqu.V("_pkey"),
+		goqu.L("?::TEXT", goqu.Func("to_json", goqu.L(fmt.Sprintf("ARRAY[%s]::text[]", strings.Join(bindings, ",")), args...))))
+
+	// Convert this to json
 	if len(jsonSubSelects) <= 100 {
 		if aggregate {
 			return goqu.Func("json_agg", goqu.Func("json_build_object", jsonSubSelects...)), nil
@@ -242,15 +254,15 @@ func GetResultsInChan[T any](conn *pgx.Conn, query string, withIntermediateView 
 	}
 }
 
-func ExtractKeysFromMapAsSlice[T any](keys []string, target map[string]any) ([]T, error) {
-	var result = make([]T, len(keys))
+func ExtractKeysFromMapAsJsonString(keys []string, target map[string]any) (string, error) {
+	var result = make([]string, len(keys))
 
-	targetType := reflect.TypeOf((*T)(nil)).Elem()
+	targetType := reflect.TypeOf((*string)(nil)).Elem()
 
 	for idx, key := range keys {
 		value, exists := target[key]
 		if !exists {
-			return nil, fmt.Errorf("key %s does not exist", key)
+			return "", fmt.Errorf("key %s does not exist", key)
 		}
 
 		val := reflect.ValueOf(value)
@@ -259,33 +271,49 @@ func ExtractKeysFromMapAsSlice[T any](keys []string, target map[string]any) ([]T
 			switch val.Kind() {
 			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 				convertedValue := strconv.FormatInt(val.Int(), 10) // Conversion des types entiers signés en string
-				result[idx] = any(convertedValue).(T)
+				result[idx] = any(convertedValue).(string)
 			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 				convertedValue := strconv.FormatUint(val.Uint(), 10) // Conversion des types entiers non signés en string
-				result[idx] = any(convertedValue).(T)
+				result[idx] = any(convertedValue).(string)
 			case reflect.Float32, reflect.Float64:
 				convertedValue := strconv.FormatFloat(val.Float(), 'f', -1, 64) // Conversion des types flottants en string
-				result[idx] = any(convertedValue).(T)
+				result[idx] = any(convertedValue).(string)
 			default:
 				if val.Type().ConvertibleTo(targetType) {
 					convertedValue := val.Convert(targetType).Interface()
-					result[idx] = convertedValue.(T)
+					result[idx] = convertedValue.(string)
 				} else {
-					return nil, fmt.Errorf("value for key %s cannot be converted to type %T", key, result[idx])
+					return "", fmt.Errorf("value for key %s cannot be converted to type %T", key, result[idx])
 				}
 			}
 		} else if val.Type().ConvertibleTo(targetType) {
 			convertedValue := val.Convert(targetType).Interface()
-			result[idx] = convertedValue.(T)
+			result[idx] = convertedValue.(string)
 		} else {
-			return nil, fmt.Errorf("value for key %s cannot be converted to type %T", key, result[idx])
+			return "", fmt.Errorf("value for key %s cannot be converted to type %T", key, result[idx])
 		}
 	}
 
-	return result, nil
+	return GetPrimaryKeysAsString(result), nil
+}
+
+func GetPrimaryKeysAsString(keys []string) string {
+	var sb strings.Builder
+	sb.WriteString("[")
+	for i, str := range keys {
+		sb.WriteString(strconv.Quote(str))
+		if i < len(keys)-1 {
+			sb.WriteString(",")
+		}
+	}
+	sb.WriteString("]")
+	return sb.String()
 }
 
 func MapDiff(map1 map[string]any, map2 map[string]any) map[string]any {
+	//return map2
+	// TODO PROBABLY USELESS
+
 	diff := make(map[string]any)
 	for k, v1 := range map1 {
 		if v2, ok := map2[k]; ok {

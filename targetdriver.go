@@ -19,7 +19,28 @@ type TargetDriver interface {
 
 	TestConfig() (string, error) // TODO USELESS REPLACE IN FAVOR OF STATS TO CHECK NOT EMPTY
 
-	HandleEvents(processor *Processor, eventsChan <-chan Event, ctx context.Context) error
+	HandleEvents(processor *Processor, eventsChan <-chan TargetEvent, ctx context.Context) error
 
 	Shutdown() error
 }
+
+// Event
+
+type TargetInsertEvent struct {
+	Pkey string
+	Json []byte
+}
+
+type TargetPatchEvent struct {
+	Path      string
+	Pkey      string
+	JsonPatch []byte
+}
+
+type TargetDeleteEvent struct {
+	Pkey string
+}
+
+type TargetTruncateEvent struct{}
+
+type TargetEvent any // TargetDeleteEvent | TargetInsertEvent | TargetPatchEvent | TargetTruncateEvent

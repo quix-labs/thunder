@@ -3,6 +3,7 @@ package thunder
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 )
@@ -36,30 +37,9 @@ type Processor struct {
 }
 
 type Document struct {
-	PrimaryKeys []string `json:"primary_keys"`
-	Json        []byte   `json:"json"`
+	Pkey string `json:"_pkey"`
+	Json []byte `json:"json"`
 }
-
-// Target events
-
-type InsertEvent struct {
-	PrimaryKeys []string
-	Json        []byte
-}
-
-type PatchEvent struct {
-	Path        string //TODO
-	PrimaryKeys []string
-	JsonPatch   []byte
-}
-
-type DeleteEvent struct {
-	PrimaryKeys []string
-}
-
-type TruncateEvent struct{}
-
-type Event any // DeleteEvent | InsertEvent | PatchEvent | TruncateEvent
 
 func (p *Processor) Start() error {
 	if p.Listening.Load() {
@@ -79,13 +59,13 @@ func (p *Processor) Start() error {
 	p.ContextCancel = cancel
 	defer p.ContextCancel()
 
-	var eventsChan = make(chan Event)
+	var eventsChan = make(chan DbEvent)
 	defer close(eventsChan)
 
 	// Bootstrap target channels
-	var targetChannels = make([]chan Event, len(p.Targets))
+	var targetChannels = make([]chan TargetEvent, len(p.Targets))
 	for i, _ := range p.Targets {
-		targetChannels[i] = make(chan Event, 1)
+		targetChannels[i] = make(chan TargetEvent, 1)
 	}
 
 	// Start target in parallel
@@ -106,7 +86,31 @@ func (p *Processor) Start() error {
 	go func() {
 		for event := range eventsChan {
 			for _, channel := range targetChannels {
-				channel <- event
+				switch typedEvent := event.(type) {
+				case *DbInsertEvent:
+					fmt.Println("inser event received")
+					// TODO FETCH FULL USING PRIMARY KEYS
+
+					//channel <- &TargetInsertEvent{
+					//	PrimaryKeys: typedEvent.PrimaryKeys,
+					//	Json:        typedEvent.Json,
+					//}
+				case *DbPatchEvent:
+					channel <- &TargetPatchEvent{
+						Path:      typedEvent.Path,
+						Pkey:      typedEvent.Pkey,
+						JsonPatch: typedEvent.JsonPatch,
+					}
+
+				case *DbDeleteEvent:
+					channel <- &TargetDeleteEvent{
+						Pkey: typedEvent.Pkey,
+					}
+
+				case *DbTruncateEvent:
+					channel <- &TargetTruncateEvent{}
+				}
+
 			}
 		}
 	}()
@@ -152,9 +156,9 @@ func (p *Processor) FullIndex() error {
 	}()
 
 	// Initialize channels
-	var targetEventsChans = make([]chan Event, len(p.Targets))
+	var targetEventsChans = make([]chan TargetEvent, len(p.Targets))
 	for idx, _ := range p.Targets {
-		targetEventsChans[idx] = make(chan Event, 1)
+		targetEventsChans[idx] = make(chan TargetEvent, 1)
 	}
 
 	// Start targets in parallel
@@ -188,9 +192,9 @@ func (p *Processor) FullIndex() error {
 
 			// Dispatch across different targets
 			for _, targetEventChan := range targetEventsChans {
-				event := &InsertEvent{
-					PrimaryKeys: doc.PrimaryKeys,
-					Json:        doc.Json,
+				event := &TargetInsertEvent{
+					Pkey: doc.Pkey,
+					Json: doc.Json,
 				}
 				targetEventChan <- event
 			}

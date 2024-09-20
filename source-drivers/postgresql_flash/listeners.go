@@ -42,23 +42,22 @@ func appendRelationConfig(
 		Fields: baseFields,
 	}
 
-	/*
-		for _, field := range *mapping {
-			if field.FieldType == "relation" {
-				var nestedPath string
-				if path != "" {
-					nestedPath = path + "." + field.Name
-				} else {
-					nestedPath = field.Name
-				}
+	for _, field := range *mapping {
+		if field.FieldType == "relation" {
+			var nestedPath string
+			if path != "" {
+				nestedPath = path + "." + field.Name
+			} else {
+				nestedPath = field.Name
+			}
 
-				// TODO PIVOT TABLES
-				if err := appendRelationConfig(nestedPath, field.Table, &field.Mapping, configs, field.PrimaryKeys); err != nil {
-					return err
-				}
+			// TODO PIVOT TABLES
+			if err := appendRelationConfig(nestedPath, field.Table, &field.Mapping, configs, field.PrimaryKeys); err != nil {
+				return err
 			}
 		}
-	*/
+	}
+
 	(*configs)[path] = &RealtimeConfigItem{
 		Table:          table,
 		PrimaryKeys:    primaryKeys,

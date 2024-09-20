@@ -36,9 +36,30 @@ type SourceDriver interface {
 
 	// Real Time Indexing
 
-	Start(processor *Processor, eventsChan chan<- Event, ctx context.Context) error
+	Start(processor *Processor, eventsChan chan<- DbEvent, ctx context.Context) error
 	Stop() error
 }
+
+// Events
+
+type DbInsertEvent struct {
+	Pkey string
+}
+
+type DbPatchEvent struct {
+	Path string
+
+	Pkey      string
+	JsonPatch []byte
+}
+
+type DbDeleteEvent struct {
+	Pkey string
+}
+
+type DbTruncateEvent struct{}
+
+type DbEvent any // DbDeleteEvent | DbInsertEvent | DbPatchEvent | DbTruncateEvent
 
 // UTILITIES FUNCTIONS
 
