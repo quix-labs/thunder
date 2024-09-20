@@ -34,7 +34,10 @@ func AddProcessor(p *Processor) error {
 	// TODO ERROR ON DUPLICATE
 
 	if p.ID == 0 {
-		newId := len(processors) + 1
+		newId := 1
+		for _, exists := processors[newId]; exists; _, exists = processors[newId] {
+			newId++
+		}
 		p.ID = newId
 	}
 

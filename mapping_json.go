@@ -108,6 +108,7 @@ func UnserializeMapping(jm *JsonMapping, parent *Relation) (*Mapping, error) {
 		}
 
 		if field.FieldType == "relation" {
+
 			relation := Relation{
 				Name:        field.Name,
 				Many:        field.Type == "has-many",
@@ -116,7 +117,7 @@ func UnserializeMapping(jm *JsonMapping, parent *Relation) (*Mapping, error) {
 
 				LocalKey:   field.LocalKey,
 				ForeignKey: field.ForeignKey,
-				Parent:     parent,
+				Children:   []*Relation{},
 			}
 
 			// Add pivot if needed
@@ -139,6 +140,12 @@ func UnserializeMapping(jm *JsonMapping, parent *Relation) (*Mapping, error) {
 				return nil, err
 			}
 			relation.Mapping = *nestedMapping
+
+			// Set navigation pointer if parent exists
+			if parent != nil {
+				relation.Parent = parent
+				parent.Children = append(parent.Children, &relation)
+			}
 
 			// Inject relation
 			mapping.Relations = append(mapping.Relations, relation)

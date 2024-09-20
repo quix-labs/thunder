@@ -30,11 +30,11 @@ func AddTarget(t *Target) error {
 	targetsMu.Lock()
 	defer targetsMu.Unlock()
 
-	// TODO UNIQUE ID INSTEAD OF INCREMENT
-	// TODO ERROR ON DUPLICATE
-
 	if t.ID == 0 {
-		newId := len(targets) + 1
+		newId := 1
+		for _, exists := targets[newId]; exists; _, exists = targets[newId] {
+			newId++
+		}
 		t.ID = newId
 	}
 

@@ -31,7 +31,9 @@ type Relation struct {
 
 	Mapping Mapping
 
-	Parent *Relation
+	// Recursive navigation
+	Parent   *Relation
+	Children []*Relation
 }
 
 // COMPLETE MAPPING

@@ -30,10 +30,11 @@ func AddSource(s *Source) error {
 	sourcesMu.Lock()
 	defer sourcesMu.Unlock()
 
-	// TODO UNIQUE ID INSTEAD OF INCREMENT
-	// TODO ERROR ON DUPLICATE
 	if s.ID == 0 {
-		newId := len(sources) + 1
+		newId := 1
+		for _, exists := sources[newId]; exists; _, exists = sources[newId] {
+			newId++
+		}
 		s.ID = newId
 	}
 
