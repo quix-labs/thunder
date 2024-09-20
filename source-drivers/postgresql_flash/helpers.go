@@ -84,55 +84,59 @@ func GetSqlForProcessor(processor *thunder.Processor) (string, error) {
 func processMapping(tableAlias string, mapping *thunder.Mapping, mappingJoins *joins, aggregate bool, primaryKeys []string) (exp.Aliaseable, error) {
 	var jsonSubSelects []any
 
-	for _, field := range *mapping {
-		if field.FieldType == "simple" {
-			expectedName := field.Name
-			if expectedName == "" {
-				expectedName = field.Column
+	// Append fields
+	if mapping.Fields != nil {
+		for _, field := range mapping.Fields {
+			expectedName := field.Column
+			if field.Name != nil && (*field.Name) != "" {
+				expectedName = *field.Name
 			}
 			jsonSubSelects = append(jsonSubSelects, goqu.V(expectedName), goqu.I(tableAlias+"."+field.Column))
-			continue
 		}
+	}
 
-		if field.FieldType == "relation" {
+	// Recursively append relations
+	if mapping.Relations != nil {
+		for _, relation := range mapping.Relations {
 			var relationJoins joins
-			relationExpr, err := processMapping(field.Table, &field.Mapping, &relationJoins, field.Type == "has-many", field.PrimaryKeys)
+			relationExpr, err := processMapping(relation.Table, &relation.Mapping, &relationJoins, relation.Many, relation.PrimaryKeys)
 			if err != nil {
 				return nil, err
 			}
 
-			query := goqu.From(goqu.T(field.Table)).Select(relationExpr.As("result"))
+			query := goqu.From(goqu.T(relation.Table)).Select(relationExpr.As("result"))
 
 			for _, join := range relationJoins {
 				query = query.LeftOuterJoin(join.Table, join.On)
 			}
 
-			relationAlias := field.Table + "_" + generateAlias()
-			if field.UsePivotTable {
-				pivotAlias := tableAlias + "_" + field.PivotTable + "_" + generateAlias()
-				query = query.From(goqu.T(field.PivotTable).As(pivotAlias)).SelectAppend(
-					goqu.I(pivotAlias+"."+field.ForeignPivotKey).As("_pivot_key"),
+			relationAlias := relation.Table + "_" + generateAlias()
+			if relation.Pivot != nil {
+				//TODO PIVOT FIELDS
+				pivotAlias := tableAlias + "_" + relation.Pivot.Table + "_" + generateAlias()
+				query = query.From(goqu.T(relation.Pivot.Table).As(pivotAlias)).SelectAppend(
+					goqu.I(pivotAlias+"."+relation.Pivot.ForeignKey).As("_pivot_key"),
 				).InnerJoin(
-					goqu.T(field.Table),
-					goqu.On(goqu.I(field.Table+"."+field.ForeignKey).Eq(goqu.I(pivotAlias+"."+field.LocalPivotKey))),
-				).GroupBy(goqu.I(pivotAlias + "." + field.ForeignPivotKey))
+					goqu.T(relation.Table),
+					goqu.On(goqu.I(relation.Table+"."+relation.ForeignKey).Eq(goqu.I(pivotAlias+"."+relation.Pivot.LocalKey))),
+				).GroupBy(goqu.I(pivotAlias + "." + relation.Pivot.ForeignKey))
 
 				*mappingJoins = append(*mappingJoins, join{
 					Table: query.As(relationAlias),
-					On:    goqu.On(goqu.I(relationAlias + "._pivot_key").Eq(goqu.I(tableAlias + "." + field.LocalKey))),
+					On:    goqu.On(goqu.I(relationAlias + "._pivot_key").Eq(goqu.I(tableAlias + "." + relation.LocalKey))),
 				})
 			} else {
-				query = query.SelectAppend(goqu.I(field.Table + "." + field.ForeignKey).As("_pkey"))
-				if field.Type == "has-many" {
-					query = query.GroupBy(goqu.I(field.Table + "." + field.ForeignKey))
+				query = query.SelectAppend(goqu.I(relation.Table + "." + relation.ForeignKey).As("_pkey"))
+				if relation.Many {
+					query = query.GroupBy(goqu.I(relation.Table + "." + relation.ForeignKey))
 				}
 
 				*mappingJoins = append(*mappingJoins, join{
 					Table: query.As(relationAlias),
-					On:    goqu.On(goqu.I(tableAlias + "." + field.LocalKey).Eq(goqu.I(relationAlias + "._pkey"))),
+					On:    goqu.On(goqu.I(tableAlias + "." + relation.LocalKey).Eq(goqu.I(relationAlias + "._pkey"))),
 				})
 			}
-			jsonSubSelects = append(jsonSubSelects, goqu.V(field.Name), goqu.I(relationAlias+".result"))
+			jsonSubSelects = append(jsonSubSelects, goqu.V(relation.Name), goqu.I(relationAlias+".result"))
 		}
 	}
 

@@ -31,7 +31,7 @@ type ProcessorApiDetails struct {
 	Table       string              `json:"table"`
 	PrimaryKeys []string            `json:"primary_keys"`
 	Conditions  []thunder.Condition `json:"conditions"`
-	Mapping     thunder.Mapping     `json:"mapping"`
+	Mapping     thunder.JsonMapping `json:"mapping"`
 	Index       string              `json:"index"`
 	Enabled     bool                `json:"enabled"`
 }

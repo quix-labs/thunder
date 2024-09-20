@@ -2,10 +2,8 @@ package thunder
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os/signal"
-	"sync"
 	"syscall"
 )
 
@@ -51,25 +49,25 @@ func Start() error {
 		}()
 	}
 
-	var processorsWg sync.WaitGroup
-	var processorErrChan = make(chan error)
+	//var processorsWg sync.WaitGroup
+	//var processorErrChan = make(chan error)
 
-	for _, p := range GetProcessors() {
-		//if !p.Enabled {
-		//	continue
-		//}
-		processorsWg.Add(1)
-		go func() {
-			defer func() {
-				processorsWg.Done()
-				fmt.Println("processor stopped")
-			}()
-			err := p.Start()
-			if err != nil && !errors.Is(err, context.Canceled) {
-				processorErrChan <- err
-			}
-		}()
-	}
+	//for _, p := range GetProcessors() {
+	//	//if !p.Enabled {
+	//	//	continue
+	//	//}
+	//	processorsWg.Add(1)
+	//	go func() {
+	//		defer func() {
+	//			processorsWg.Done()
+	//			fmt.Println("processor stopped")
+	//		}()
+	//		err := p.Start()
+	//		if err != nil && !errors.Is(err, context.Canceled) {
+	//			processorErrChan <- err
+	//		}
+	//	}()
+	//}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -91,7 +89,7 @@ func Start() error {
 		}
 	}
 
-	processorsWg.Wait()
+	//processorsWg.Wait()
 
 	return nil
 }

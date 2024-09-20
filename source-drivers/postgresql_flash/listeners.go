@@ -1,7 +1,6 @@
 package postgresql_flash
 
 import (
-	"fmt"
 	"github.com/quix-labs/flash"
 	"github.com/quix-labs/thunder"
 )
@@ -42,20 +41,20 @@ func appendRelationConfig(
 		Fields: baseFields,
 	}
 
-	for _, field := range *mapping {
-		if field.FieldType == "relation" {
-			var nestedPath string
-			if path != "" {
-				nestedPath = path + "." + field.Name
-			} else {
-				nestedPath = field.Name
-			}
+	for _, relation := range mapping.Relations {
 
-			// TODO PIVOT TABLES
-			if err := appendRelationConfig(nestedPath, field.Table, &field.Mapping, configs, field.PrimaryKeys); err != nil {
-				return err
-			}
+		var nestedPath string
+		if path != "" {
+			nestedPath = path + "." + relation.Name
+		} else {
+			nestedPath = relation.Name
 		}
+
+		// TODO PIVOT TABLES
+		if err := appendRelationConfig(nestedPath, relation.Table, &relation.Mapping, configs, relation.PrimaryKeys); err != nil {
+			return err
+		}
+
 	}
 
 	(*configs)[path] = &RealtimeConfigItem{
@@ -69,20 +68,8 @@ func appendRelationConfig(
 
 func extractMappingColumns(m *thunder.Mapping, additional []string) ([]string, error) {
 	var columns = additional
-	for _, field := range *m {
-		switch field.FieldType {
-		case "relation":
-			break
-		case "simple":
-			if field.Name != "" {
-				columns = append(columns, field.Name)
-			} else if field.Column != "" {
-				columns = append(columns, field.Column)
-			}
-			break
-		default:
-			return nil, fmt.Errorf("invalid field type: %s", field.FieldType)
-		}
+	for _, field := range m.Fields {
+		columns = append(columns, field.Column)
 	}
 	return columns, nil
 }

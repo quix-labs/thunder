@@ -10,7 +10,7 @@ type JsonProcessor struct {
 	PrimaryKeys []string    `json:"primary_keys"`
 	Conditions  []Condition `json:"conditions"`
 
-	Mapping Mapping `json:"mapping"`
+	Mapping JsonMapping `json:"mapping"`
 
 	Index string `json:"index"`
 
@@ -18,6 +18,11 @@ type JsonProcessor struct {
 }
 
 func SerializeProcessor(s *Processor) (*JsonProcessor, error) {
+	jsonMapping, err := SerializeMapping(&s.Mapping)
+	if err != nil {
+		return nil, err
+	}
+
 	jp := JsonProcessor{
 		ID:          s.ID,
 		Source:      s.Source.ID,
@@ -25,7 +30,7 @@ func SerializeProcessor(s *Processor) (*JsonProcessor, error) {
 		Table:       s.Table,
 		PrimaryKeys: s.PrimaryKeys,
 		Conditions:  s.Conditions,
-		Mapping:     s.Mapping,
+		Mapping:     *jsonMapping,
 		Index:       s.Index,
 		Enabled:     s.Enabled,
 	}
@@ -38,12 +43,16 @@ func SerializeProcessor(s *Processor) (*JsonProcessor, error) {
 }
 
 func UnserializeProcessor(jp *JsonProcessor) (*Processor, error) {
+	mapping, err := UnserializeMapping(&jp.Mapping, nil)
+	if err != nil {
+		return nil, err
+	}
 	p := Processor{
 		ID:          jp.ID,
 		Table:       jp.Table,
 		PrimaryKeys: jp.PrimaryKeys,
 		Conditions:  jp.Conditions,
-		Mapping:     jp.Mapping,
+		Mapping:     *mapping,
 		Index:       jp.Index,
 		Enabled:     jp.Enabled,
 	}
