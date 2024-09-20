@@ -144,12 +144,12 @@ Go to `/targets` to configure them
 
 ## Realtime compatibility Table
 
-|      Target      | Insert | Insert rel_col | Update | Update rel_col | Delete | Delete rel col |          Truncate          |
-|:----------------:|:------:|:--------------:|:------:|:--------------:|:------:|:--------------:|:--------------------------:|
-|    Base table    |  ❌ ◀   |      ❌ ◀       |   ✅    |      ❌ ◀       |   ✅    |       ❌        |             ✅              |
-|    one_to_one    |  N/A   |      ❌ ◀       |   ✅    |      ❌ ◀       |   ✅    |       ❌        |             ✅              |
-|     has-many     |  ❌ ⏳   |      ❌ ◀       |  ❌ ⏳   |      ❌ ◀       |  ❌  ⏳  |       ❌        | ✅ (use [] instead of null) |
-| has-many (pivot) |  ❌ ◀   |      ❌ ◀       |  ❌ ◀   |      ❌ ◀       |   ❌    |       ❌        |             ❌              |
+|      Target      | Insert | Insert rel_col | Update | Update rel_col | Delete | Delete rel col | Truncate |
+|:----------------:|:------:|:--------------:|:------:|:--------------:|:------:|:--------------:|:--------:|
+|    Base table    |  ❌ ◀   |      ❌ ◀       |   ✅    |      ❌ ◀       |   ✅    |       ❌        |    ✅     |
+|    one_to_one    |  N/A   |      ❌ ◀       |   ✅    |      ❌ ◀       |   ✅    |       ❌        |    ✅     |
+|     has-many     |  ❌ ⏳   |      ❌ ◀       |   ✅    |      ❌ ◀       |   ✅    |       ❌        |    ✅     |
+| has-many (pivot) |  ❌ ◀   |      ❌ ◀       |  ❌ ◀   |      ❌ ◀       |   ❌    |       ❌        |    ❌     |
 
 - ◀: `Need to send select request (impact DB)`
 

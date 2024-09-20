@@ -28,7 +28,7 @@ func (cfg DriverConfig) Excerpt() string {
 	}
 
 	if cfg.Prefix != "" {
-		cnx += "/" + cfg.Prefix
+		cnx += " (prefix:" + cfg.Prefix + ")"
 	}
 	return cnx
 }

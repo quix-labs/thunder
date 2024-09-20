@@ -36,6 +36,16 @@ type Relation struct {
 	Children []*Relation
 }
 
+func (r *Relation) Path() string {
+	path := r.Name
+	parent := r.Parent
+	for parent != nil {
+		path = parent.Name + "." + path
+		parent = parent.Parent
+	}
+	return path
+}
+
 // COMPLETE MAPPING
 
 type Mapping struct {

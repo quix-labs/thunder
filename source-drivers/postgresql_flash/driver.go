@@ -145,32 +145,32 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 	})
 
 	// Register all listener
-	prefixedConfig, err := GetRealtimeConfigForProcessor(p)
+	mappedConfig, err := GetRealtimeConfigForProcessor(p)
 	if err != nil {
 		return err
 	}
 
 	var listenerErrChan = make(chan error, 1)
 
-	for path, config := range prefixedConfig {
+	for relation, config := range mappedConfig {
 		listener, err := flash.NewListener(config.ListenerConfig)
 		if err != nil {
 			return err
 		}
 		// Handle root table changes
-		if path == "" {
+		if relation == nil {
 			// TODO OFF GRACEFULL SHUTDOWN
 			_, err = listener.On(flash.OperationAll, func(event flash.Event) {
 				switch typedEvent := event.(type) {
 				case *flash.InsertEvent:
-					pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.New)
+					pkey, err := ExtractPkeyFromMap(config.PrimaryKeys, *typedEvent.New)
 					if err != nil {
 						listenerErrChan <- err
 						return
 					}
 					eventsChan <- &thunder.DbInsertEvent{Pkey: pkey}
 				case *flash.UpdateEvent:
-					pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.Old)
+					pkey, err := ExtractPkeyFromMap(config.PrimaryKeys, *typedEvent.Old)
 					if err != nil {
 						listenerErrChan <- err
 						return
@@ -182,7 +182,7 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 					}
 					eventsChan <- &thunder.DbPatchEvent{Pkey: pkey, JsonPatch: jsonPatch}
 				case *flash.DeleteEvent:
-					pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.Old)
+					pkey, err := ExtractPkeyFromMap(config.PrimaryKeys, *typedEvent.Old)
 					if err != nil {
 						listenerErrChan <- err
 						return
@@ -203,7 +203,7 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 		_, err = listener.On(flash.OperationUpdate^flash.OperationTruncate^flash.OperationDelete, func(event flash.Event) {
 			switch typedEvent := event.(type) {
 			case *flash.UpdateEvent:
-				pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.Old)
+				pkey, err := ExtractPkeyFromMap(config.PrimaryKeys, *typedEvent.Old)
 				if err != nil {
 					listenerErrChan <- err
 					return
@@ -213,27 +213,28 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 					listenerErrChan <- err
 					return
 				}
+
 				eventsChan <- &thunder.DbPatchEvent{
-					Path:      path,
+					Relation:  relation,
 					Pkey:      pkey,
 					JsonPatch: jsonPatch,
 				}
 
 			case *flash.TruncateEvent:
 				eventsChan <- &thunder.DbTruncateEvent{
-					Path: path,
+					Relation: relation,
 				}
 
 			case *flash.DeleteEvent:
-				pkey, err := ExtractKeysFromMapAsJsonString(config.PrimaryKeys, *typedEvent.Old)
+				pkey, err := ExtractPkeyFromMap(config.PrimaryKeys, *typedEvent.Old)
 				if err != nil {
 					listenerErrChan <- err
 					return
 				}
 
 				eventsChan <- &thunder.DbDeleteEvent{
-					Path: path,
-					Pkey: pkey,
+					Relation: relation,
+					Pkey:     pkey,
 				}
 			}
 

@@ -97,20 +97,20 @@ func (p *Processor) Start() error {
 					//}
 				case *DbPatchEvent:
 					channel <- &TargetPatchEvent{
-						Path:      typedEvent.Path,
+						Relation:  typedEvent.Relation,
 						Pkey:      typedEvent.Pkey,
 						JsonPatch: typedEvent.JsonPatch,
 					}
 
 				case *DbDeleteEvent:
 					channel <- &TargetDeleteEvent{
-						Pkey: typedEvent.Pkey,
-						Path: typedEvent.Path,
+						Pkey:     typedEvent.Pkey,
+						Relation: typedEvent.Relation,
 					}
 
 				case *DbTruncateEvent:
 					channel <- &TargetTruncateEvent{
-						Path: typedEvent.Path,
+						Relation: typedEvent.Relation,
 					}
 				}
 

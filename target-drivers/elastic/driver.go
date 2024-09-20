@@ -82,7 +82,7 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 				break
 			case *thunder.TargetPatchEvent:
 				// Handle base table update
-				if typedEvent.Path == "" {
+				if typedEvent.Relation == nil {
 					bulkIndexer.Add(
 						[]byte(`{"update":{"_index":"`+index+`","_id":"`+SanitizeJsonString(typedEvent.Pkey)+`"}}`),
 						bytes.Join([][]byte{[]byte(`{"doc":`), typedEvent.JsonPatch, []byte("}")}, []byte("")),
@@ -91,39 +91,52 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 				}
 
 				// Handle relation patch
-				reqBody := fmt.Sprintf(`
-    {
-        "script": {
-            "source": "for (entry in params.patch.entrySet()) { ctx._source.%s[entry.getKey()] = entry.getValue(); }",
-            "params": {
-                "patch": %s
-            }
-        },
-        "query": {
-            "match": {
-                "%s._pkey": "%s" 
-            }
-        }
-    }`, typedEvent.Path, typedEvent.JsonPatch, typedEvent.Path, SanitizeJsonString(typedEvent.Pkey))
-				//TODO MANY TO MANY ARRAY
-				//"source": "for (int i = 0; i < ctx._source.%s.length; i++) { if (ctx._source.%s[i].author == params.oldAuthor) { ctx._source.%s[i].author = params.newAuthor; } }",
+				path := typedEvent.Relation.Path()
+				var reqBody string
+				if typedEvent.Relation.Many {
+					reqBody = fmt.Sprintf(`{
+						"script": {
+							"source": "for (int i = 0; i < ctx._source.%s.size(); i++) { if (ctx._source.%s[i]._pkey == '%s') { for (entry in params.patch.entrySet()) { ctx._source.%s[i][entry.getKey()] = entry.getValue(); } } }",
+							"params": {"patch": %s}
+						},
+						"query": {"match": {"%s._pkey": "%s"}}
+					}`, path, path, SanitizeJsonString(typedEvent.Pkey), path, typedEvent.JsonPatch, path, SanitizeJsonString(typedEvent.Pkey))
+				} else {
+					reqBody = fmt.Sprintf(`{
+						"script": {
+							"source": "for (entry in params.patch.entrySet()) { ctx._source.%s[entry.getKey()] = entry.getValue(); }",
+							"params": {"patch": %s}
+						},
+						"query": {"match": {"%s._pkey": "%s"}}
+					}`, path, typedEvent.JsonPatch, path, SanitizeJsonString(typedEvent.Pkey))
+				}
 
+				var refresh = true // IMPORTANT TO AVOID BURST 409
 				req := esapi.UpdateByQueryRequest{
-					Index: []string{index},
-					Body:  strings.NewReader(reqBody),
+					Index:   []string{index},
+					Refresh: &refresh,
+					Body:    strings.NewReader(reqBody),
 				}
 
 				res, err := req.Do(ctx, d.client)
 				if err != nil {
 					return err
 				}
+
+				if res.IsError() {
+					err := errors.New(res.String())
+					_ = res.Body.Close()
+					fmt.Println(err)
+					return err
+				}
+
 				if err = res.Body.Close(); err != nil {
 					return err
 				}
 
 			case *thunder.TargetDeleteEvent:
 				// Handle base table delete
-				if typedEvent.Path == "" {
+				if typedEvent.Relation == nil {
 					bulkIndexer.Add(
 						[]byte(`{"delete":{"_index":"` + index + `","_id":"` + SanitizeJsonString(typedEvent.Pkey) + `"}}`),
 					)
@@ -131,12 +144,20 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 				}
 
 				// Handle relation delete
-				reqBody := fmt.Sprintf(`{
-					"script": {"source": "if (ctx._source.%s != null) { ctx._source.%s = null; }"},
-					"query": {"match": {"%s._pkey":"%s"}}
-				}`, typedEvent.Path, typedEvent.Path, typedEvent.Path, SanitizeJsonString(typedEvent.Pkey))
+				path := typedEvent.Relation.Path()
+				var reqBody string
+				if typedEvent.Relation.Many == true {
+					reqBody = fmt.Sprintf(`{
+						"script": "ctx._source.%s.removeIf(item -> item._pkey =='%s')",
+						"query": {"match": {"%s._pkey":"%s"}}
+					}`, path, SanitizeJsonString(typedEvent.Pkey), path, SanitizeJsonString(typedEvent.Pkey))
 
-				//TODO MANY TO MANY ARRAY
+				} else {
+					reqBody = fmt.Sprintf(`{
+						"script": "ctx._source.%s=null",
+						"query": {"match": {"%s._pkey":"%s"}}
+					}`, path, path, SanitizeJsonString(typedEvent.Pkey))
+				}
 
 				var refresh = true // IMPORTANT TO AVOID BURST 409
 				req := esapi.UpdateByQueryRequest{Index: []string{index},
@@ -147,6 +168,11 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 				res, err := req.Do(ctx, d.client)
 				if err != nil {
 					return err
+				}
+
+				if res.IsError() {
+					_ = res.Body.Close()
+					return fmt.Errorf(res.String())
 				}
 
 				if err = res.Body.Close(); err != nil {
@@ -155,8 +181,8 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 
 			case *thunder.TargetTruncateEvent:
 				// Handle base table truncate
-				if typedEvent.Path == "" {
-					res, err := d.client.DeleteByQuery(index).
+				if typedEvent.Relation == nil {
+					_, err := d.client.DeleteByQuery(index).
 						Query(&types.Query{MatchAll: &types.MatchAllQuery{}}).
 						Refresh(true). // IMPORTANT TO AVOID BURST 409
 						Do(context.Background())
@@ -164,18 +190,25 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 						fmt.Println(err)
 						return err
 					}
-					fmt.Println(res.Deleted)
 					continue
 				}
 
 				// Handle relation truncate
+				path := typedEvent.Relation.Path()
+
+				scriptNewValue := "null"
+				if typedEvent.Relation.Many {
+					scriptNewValue = "[]"
+				}
+
 				reqBody := fmt.Sprintf(`{
-					"script": {"source": "if (ctx._source.%s != null) { ctx._source.%s = null; }"},
+					"script": {"source": "if (ctx._source.%s != null) { ctx._source.%s = %s; }"},
 					"query": {"exists": {"field": "%s._pkey"}}
-				}`, typedEvent.Path, typedEvent.Path, typedEvent.Path)
+				}`, path, path, scriptNewValue, path)
 
 				var refresh = true // IMPORTANT TO AVOID BURST 409
-				req := esapi.UpdateByQueryRequest{Index: []string{index},
+				req := esapi.UpdateByQueryRequest{
+					Index:   []string{index},
 					Refresh: &refresh,
 					Body:    strings.NewReader(reqBody),
 				}
@@ -183,6 +216,11 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 				res, err := req.Do(ctx, d.client)
 				if err != nil {
 					return err
+				}
+
+				if res.IsError() {
+					_ = res.Body.Close()
+					return fmt.Errorf(res.String())
 				}
 
 				if err = res.Body.Close(); err != nil {

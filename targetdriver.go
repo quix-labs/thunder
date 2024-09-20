@@ -32,18 +32,18 @@ type TargetInsertEvent struct {
 }
 
 type TargetPatchEvent struct {
-	Path      string
+	Relation  *Relation
 	Pkey      string
 	JsonPatch []byte
 }
 
 type TargetDeleteEvent struct {
-	Path string
-	Pkey string
+	Relation *Relation
+	Pkey     string
 }
 
 type TargetTruncateEvent struct {
-	Path string
+	Relation *Relation
 }
 
 type TargetEvent any // TargetDeleteEvent | TargetInsertEvent | TargetPatchEvent | TargetTruncateEvent

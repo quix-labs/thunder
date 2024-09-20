@@ -11,14 +11,14 @@ type RealtimeConfigItem struct {
 
 	ListenerConfig *flash.ListenerConfig
 }
-type RealtimeConfig map[string]*RealtimeConfigItem
+type RealtimeConfig map[*thunder.Relation]*RealtimeConfigItem
 
 func GetRealtimeConfigForProcessor(p *thunder.Processor) (RealtimeConfig, error) {
 	var configs = make(RealtimeConfig)
 
 	// TODO CONDITIONS
 	// Recursively append configs
-	if err := appendRelationConfig("", p.Table, &p.Mapping, &configs, p.PrimaryKeys); err != nil {
+	if err := appendRelationConfig(nil, p.Table, &p.Mapping, &configs, p.PrimaryKeys); err != nil {
 		return nil, err
 	}
 
@@ -26,7 +26,7 @@ func GetRealtimeConfigForProcessor(p *thunder.Processor) (RealtimeConfig, error)
 }
 
 func appendRelationConfig(
-	path string,
+	relation *thunder.Relation,
 	table string,
 	mapping *thunder.Mapping,
 	configs *RealtimeConfig,
@@ -42,22 +42,14 @@ func appendRelationConfig(
 	}
 
 	for _, relation := range mapping.Relations {
-
-		var nestedPath string
-		if path != "" {
-			nestedPath = path + "." + relation.Name
-		} else {
-			nestedPath = relation.Name
-		}
-
 		// TODO PIVOT TABLES
-		if err := appendRelationConfig(nestedPath, relation.Table, &relation.Mapping, configs, relation.PrimaryKeys); err != nil {
+		if err := appendRelationConfig(&relation, relation.Table, &relation.Mapping, configs, relation.PrimaryKeys); err != nil {
 			return err
 		}
 
 	}
 
-	(*configs)[path] = &RealtimeConfigItem{
+	(*configs)[relation] = &RealtimeConfigItem{
 		Table:          table,
 		PrimaryKeys:    primaryKeys,
 		ListenerConfig: scopedConfig,

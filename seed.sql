@@ -1,5 +1,7 @@
+DROP TABlE IF EXISTS post_tags;
 DROP TABlE IF EXISTS posts;
 DROP TABlE IF EXISTS authors;
+DROP TABlE IF EXISTS tags;
 
 CREATE TABLE authors
 (
@@ -15,6 +17,21 @@ CREATE TABLE posts
     content   TEXT         NOT NULL,
     author_id INT          REFERENCES authors (id) ON UPDATE CASCADE ON DELETE SET NULL
 );
+
+CREATE TABLE tags
+(
+    id   SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE post_tags
+(
+    post_id INT REFERENCES posts (id) ON DELETE CASCADE,
+    tag_id  INT REFERENCES tags (id) ON DELETE CASCADE,
+    PRIMARY KEY (post_id, tag_id)
+);
+
+
 
 INSERT INTO authors (name, email)
 VALUES ('Alice Dupont', 'alice.dupont@example.com'),
@@ -79,3 +96,27 @@ VALUES ('Post 1', 'Contenu du post 1', 1),
        ('Post 48', 'Contenu du post 48', 8),
        ('Post 49', 'Contenu du post 49', 9),
        ('Post 50', 'Contenu du post 50', 10);
+
+INSERT INTO tags (name)
+VALUES ('Tech'),
+       ('Science'),
+       ('Art'),
+       ('Travel'),
+       ('Food'),
+       ('Health'),
+       ('Education'),
+       ('Lifestyle');
+
+INSERT INTO post_tags (post_id, tag_id)
+VALUES (1, 1),
+       (1, 2),
+       (2, 3),
+       (3, 1),
+       (3, 4),
+       (4, 5),
+       (5, 6),
+       (6, 1),
+       (7, 7),
+       (8, 8),
+       (9, 5),
+       (10, 6);

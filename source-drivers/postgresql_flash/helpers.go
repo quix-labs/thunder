@@ -115,11 +115,11 @@ func processMapping(tableAlias string, mapping *thunder.Mapping, mappingJoins *j
 				//TODO PIVOT FIELDS
 				pivotAlias := tableAlias + "_" + relation.Pivot.Table + "_" + generateAlias()
 				query = query.From(goqu.T(relation.Pivot.Table).As(pivotAlias)).SelectAppend(
-					goqu.I(pivotAlias+"."+relation.Pivot.ForeignKey).As("_pivot_key"),
+					goqu.I(pivotAlias+"."+relation.Pivot.LocalKey).As("_pivot_key"),
 				).InnerJoin(
 					goqu.T(relation.Table),
-					goqu.On(goqu.I(relation.Table+"."+relation.ForeignKey).Eq(goqu.I(pivotAlias+"."+relation.Pivot.LocalKey))),
-				).GroupBy(goqu.I(pivotAlias + "." + relation.Pivot.ForeignKey))
+					goqu.On(goqu.I(relation.Table+"."+relation.ForeignKey).Eq(goqu.I(pivotAlias+"."+relation.Pivot.ForeignKey))),
+				).GroupBy(goqu.I(pivotAlias + "." + relation.Pivot.LocalKey))
 
 				*mappingJoins = append(*mappingJoins, join{
 					Table: query.As(relationAlias),
@@ -258,7 +258,7 @@ func GetResultsInChan[T any](conn *pgx.Conn, query string, withIntermediateView 
 	}
 }
 
-func ExtractKeysFromMapAsJsonString(keys []string, target map[string]any) (string, error) {
+func ExtractPkeyFromMap(keys []string, target map[string]any) (string, error) {
 	var result = make([]string, len(keys))
 
 	targetType := reflect.TypeOf((*string)(nil)).Elem()

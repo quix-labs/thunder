@@ -47,19 +47,19 @@ type DbInsertEvent struct {
 }
 
 type DbPatchEvent struct {
-	Path string
+	Relation *Relation
 
 	Pkey      string
 	JsonPatch []byte
 }
 
 type DbDeleteEvent struct {
-	Path string
-	Pkey string
+	Relation *Relation
+	Pkey     string
 }
 
 type DbTruncateEvent struct {
-	Path string
+	Relation *Relation
 }
 
 type DbEvent any // DbDeleteEvent | DbInsertEvent | DbPatchEvent | DbTruncateEvent
