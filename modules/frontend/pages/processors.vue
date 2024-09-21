@@ -18,7 +18,9 @@
             <div class="flex gap-1">
               <UDropdown :items="[[
                   {label:'Replicate',click:()=>cloneProcessor(row.id)},
-                  {label:'Claim indexing',click:()=>claimIndexing(row.id),disabled:row.status==='indexing'},
+                  {label:'Claim indexing',click:()=>claimIndex(row.id),disabled:row.indexing},
+                  {label:'Start listening',click:()=>claimStart(row.id),disabled:row.listening},
+                  {label:'Stop listening',click:()=>claimStop(row.id),disabled:!row.listening},
               ]]" @click.stop>
                 <UButton icon="i-heroicons-ellipsis-horizontal" variant="link" color="gray" size="xl" :padded="false"/>
               </UDropdown>
@@ -146,7 +148,7 @@ const deleteProcessor = async (id: number) => {
   }
 }
 
-const claimIndexing = (id: number) => {
+const claimIndex = (id: number) => {
   useGoFetch(`/processors/${id}/index`, {method: "POST"}).then(({data, error, status}) => {
     if (status.value === "error") {
       useToast().add({
@@ -157,6 +159,34 @@ const claimIndexing = (id: number) => {
     } else if (status.value === "success") {
       const serverData = data.value as { message?: string }
       useToast().add({color: "green", title: "Successfully indexed", description: serverData.message})
+    }
+  })
+}
+const claimStart = (id: number) => {
+  useGoFetch(`/processors/${id}/start`, {method: "POST"}).then(({data, error, status}) => {
+    if (status.value === "error") {
+      useToast().add({
+        color: "red",
+        title: "Unable to start",
+        description: error.value?.data?.error || error.value?.message
+      })
+    } else if (status.value === "success") {
+      const serverData = data.value as { message?: string }
+      useToast().add({color: "green", title: "Successfully started", description: serverData.message})
+    }
+  })
+}
+const claimStop = (id: number) => {
+  useGoFetch(`/processors/${id}/stop`, {method: "POST"}).then(({data, error, status}) => {
+    if (status.value === "error") {
+      useToast().add({
+        color: "red",
+        title: "Unable to stop",
+        description: error.value?.data?.error || error.value?.message
+      })
+    } else if (status.value === "success") {
+      const serverData = data.value as { message?: string }
+      useToast().add({color: "green", title: "Successfully stopped", description: serverData.message})
     }
   })
 }

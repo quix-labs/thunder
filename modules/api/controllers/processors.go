@@ -19,7 +19,10 @@ func ProcessorRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /go-api/processors", createProcessor)
 	mux.HandleFunc("PUT /go-api/processors/{id}", updateProcessor)
 	mux.HandleFunc("DELETE /go-api/processors/{id}", deleteProcessor)
+
 	mux.HandleFunc("POST /go-api/processors/{id}/index", indexProcessor)
+	mux.HandleFunc("POST /go-api/processors/{id}/start", startProcessor)
+	mux.HandleFunc("POST /go-api/processors/{id}/stop", stopProcessor)
 
 }
 
@@ -248,4 +251,53 @@ func indexProcessor(w http.ResponseWriter, r *http.Request) {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, "Indexing claimed"})
+}
+
+func startProcessor(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
+		return
+	}
+
+	processor, err := thunder.GetProcessor(id)
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, err, "")
+		return
+	}
+
+	go func() {
+		if err := processor.Start(); err != nil {
+			thunder.GetLoggerForProcessor(processor).Error().Msg(err.Error())
+			return
+		}
+	}()
+
+	writeJsonResponse(w, http.StatusOK, struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{true, fmt.Sprintf("Processor %d started", id)})
+}
+
+func stopProcessor(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
+		return
+	}
+
+	processor, err := thunder.GetProcessor(id)
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, err, "")
+		return
+	}
+
+	if err := processor.Stop(); err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+	}
+
+	writeJsonResponse(w, http.StatusOK, struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{true, fmt.Sprintf("Processor %d stopped", id)})
 }

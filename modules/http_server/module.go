@@ -48,7 +48,7 @@ func (m *Module) Stop() error {
 }
 
 var (
-	_ thunder.Module = (*Module)(nil) // Interface implementation
+	_ thunder.Module = (*Module)(nil)
 )
 
 // Allow external configuration

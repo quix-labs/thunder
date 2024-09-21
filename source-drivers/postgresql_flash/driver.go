@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v5"
 	"github.com/quix-labs/flash"
-	"github.com/quix-labs/flash/drivers/wal_logical"
+	"github.com/quix-labs/flash/drivers/trigger"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/utils"
 	"strconv"
@@ -133,14 +133,18 @@ func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEv
 	if err := conn.Close(context.Background()); err != nil {
 		return err
 	}
+	//time.Sleep(time.Second * 10) // TODO FIX BUG IN FLASH
 
 	// START LISTENING
 	flashClient, _ := flash.NewClient(&flash.ClientConfig{
 		Logger:      thunder.GetLoggerForSourceDriver(&Driver{}),
-		DatabaseCnx: "postgresql://devuser:devpass@localhost:5432/devdb",
-		Driver: wal_logical.NewDriver(&wal_logical.DriverConfig{
-			PublicationSlotPrefix: publicationSlotPrefix,
-			ReplicationSlot:       replicationSlot,
+		DatabaseCnx: "postgresql://devuser:devpass@localhost:5432/devdb?sslmode=disable",
+		//Driver: wal_logical.NewDriver(&wal_logical.DriverConfig{
+		//	PublicationSlotPrefix: publicationSlotPrefix,
+		//	ReplicationSlot:       replicationSlot,
+		//}),
+		Driver: trigger.NewDriver(&trigger.DriverConfig{
+			Schema: fmt.Sprintf("thunder%d", p.ID),
 		}),
 	})
 
@@ -250,7 +254,12 @@ func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEv
 	go func() {
 		errChan <- flashClient.Start()
 	}()
-	defer flashClient.Close()
+	defer func() {
+		thunder.GetLoggerForSourceDriver(d).Debug().Msg("send close signal to flash")
+		if err := flashClient.Close(); err != nil {
+			thunder.GetLoggerForSourceDriver(d).Error().Msg(err.Error())
+		}
+	}()
 
 	// Start listening
 	for {
