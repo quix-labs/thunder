@@ -4,13 +4,15 @@ go 1.23.0
 
 replace github.com/quix-labs/thunder => ../../
 
+replace github.com/quix-labs/thunder/utils => ../../utils
+
 require (
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/jackc/pgx/v5 v5.7.0
 	github.com/quix-labs/flash v0.0.0-20240715105610-d3fe20e10139
-	github.com/quix-labs/flash/drivers/trigger v0.0.0-20240715105610-d3fe20e10139
 	github.com/quix-labs/flash/drivers/wal_logical v0.0.0-20240715105610-d3fe20e10139
 	github.com/quix-labs/thunder v0.0.0-00010101000000-000000000000
+	github.com/quix-labs/thunder/utils v0.0.0-00010101000000-000000000000
 )
 
 require (

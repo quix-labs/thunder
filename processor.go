@@ -1,11 +1,11 @@
 package thunder
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"sync"
+	"github.com/quix-labs/thunder/utils"
 	"sync/atomic"
+	"time"
 )
 
 type Condition struct {
@@ -19,8 +19,8 @@ type Processor struct {
 
 	Indexing atomic.Bool
 
-	Listening     atomic.Bool
-	ContextCancel context.CancelFunc
+	Listening         atomic.Bool
+	ListenBroadcaster *utils.Broadcaster[DbEvent, TargetEvent]
 
 	Source  *Source
 	Targets []*Target
@@ -54,85 +54,71 @@ func (p *Processor) Start() error {
 		GetBroadcaster().Dispatch("processor-updated", p.ID)
 	}()
 
-	// Create the context with cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-	p.ContextCancel = cancel
-	defer p.ContextCancel()
+	// Initialize broadcaster
+	p.ListenBroadcaster = utils.NewBroadcaster[DbEvent, TargetEvent](func(event DbEvent) TargetEvent {
+		switch typedEvent := event.(type) {
+		case *DbInsertEvent:
+			fmt.Println("insert event received")
+			// TODO FETCH FULL USING PRIMARY KEYS
 
-	var eventsChan = make(chan DbEvent)
-	defer close(eventsChan)
+			//return &TargetInsertEvent{
+			//	PrimaryKeys: typedEvent.PrimaryKeys,
+			//	Json:        typedEvent.Json,
+			//}
+		case *DbPatchEvent:
+			return &TargetPatchEvent{
+				Relation:  typedEvent.Relation,
+				Pkey:      typedEvent.Pkey,
+				JsonPatch: typedEvent.JsonPatch,
+			}
 
-	// Bootstrap target channels
-	var targetChannels = make([]chan TargetEvent, len(p.Targets))
-	for i, _ := range p.Targets {
-		targetChannels[i] = make(chan TargetEvent, 1)
-	}
+		case *DbDeleteEvent:
+			return &TargetDeleteEvent{
+				Pkey:     typedEvent.Pkey,
+				Relation: typedEvent.Relation,
+			}
 
-	// Start target in parallel
-	var wg sync.WaitGroup
-	for i, target := range p.Targets {
-		wg.Add(1)
-		idx := i
+		case *DbTruncateEvent:
+			return &TargetTruncateEvent{
+				Relation: typedEvent.Relation,
+			}
+		}
+
+		return nil
+	})
+	p.ListenBroadcaster.Start()
+	defer p.ListenBroadcaster.Close()
+
+	// Start targets in parallel
+	for _, target := range p.Targets {
 		go func() {
-			defer wg.Done()
-			defer close(targetChannels[idx])
-			if err := target.Driver.HandleEvents(p, targetChannels[idx], ctx); err != nil && !errors.Is(err, context.Canceled) {
-				cancel()
+			listenChan, stopListening := p.ListenBroadcaster.NewListenChan()
+			if err := target.Driver.HandleEvents(p, listenChan); err != nil {
+				stopListening()
+				//				broadcaster.Close() Uncomment to stop emission
+				//TODO error
 			}
 		}()
 	}
 
-	// Start broadcasting events
-	go func() {
-		for event := range eventsChan {
-			for _, channel := range targetChannels {
-				switch typedEvent := event.(type) {
-				case *DbInsertEvent:
-					fmt.Println("inser event received")
-					// TODO FETCH FULL USING PRIMARY KEYS
-
-					//channel <- &TargetInsertEvent{
-					//	PrimaryKeys: typedEvent.PrimaryKeys,
-					//	Json:        typedEvent.Json,
-					//}
-				case *DbPatchEvent:
-					channel <- &TargetPatchEvent{
-						Relation:  typedEvent.Relation,
-						Pkey:      typedEvent.Pkey,
-						JsonPatch: typedEvent.JsonPatch,
-					}
-
-				case *DbDeleteEvent:
-					channel <- &TargetDeleteEvent{
-						Pkey:     typedEvent.Pkey,
-						Relation: typedEvent.Relation,
-					}
-
-				case *DbTruncateEvent:
-					channel <- &TargetTruncateEvent{
-						Relation: typedEvent.Relation,
-					}
-				}
-
-			}
-		}
-	}()
-
 	// Start driver event handling
-	err := p.Source.Driver.Start(p, eventsChan, ctx)
-	if err != nil && !errors.Is(err, context.Canceled) {
-		cancel()
+	if err := p.Source.Driver.Start(p, p.ListenBroadcaster.In()); err != nil {
+		return err
 	}
-	wg.Wait() // Wait for processor stopped
 
-	return err
+	return nil
 }
 
 func (p *Processor) Stop() error {
 	if p.Listening.Load() {
-		p.ContextCancel()
+		p.ListenBroadcaster.Close()
+		// Wait for closed
+		for p.Listening.Load() {
+			time.Sleep(10 * time.Millisecond)
+		}
 		GetBroadcaster().Dispatch("processor-updated", p.ID)
 	}
+
 	return nil
 }
 
@@ -150,70 +136,36 @@ func (p *Processor) FullIndex() error {
 	}()
 
 	// Start indexing
-	docChan := make(chan *Document, 1)
-	errChan := make(chan error, 1)
+	broadcaster := utils.NewBroadcaster[*Document, TargetEvent](func(doc *Document) TargetEvent {
+		return &TargetInsertEvent{
+			Pkey: doc.Pkey,
+			Json: doc.Json,
+		}
+	})
+	broadcaster.Start()
+	defer broadcaster.Close()
 
-	go func() {
-		defer close(docChan)
-		p.Source.Driver.GetDocumentsForProcessor(p, docChan, errChan, 0)
-	}()
-
-	// Initialize channels
-	var targetEventsChans = make([]chan TargetEvent, len(p.Targets))
-	for idx, _ := range p.Targets {
-		targetEventsChans[idx] = make(chan TargetEvent, 1)
+	// Start targets
+	for _, target := range p.Targets {
+		go func() {
+			listenChan, stopListening := broadcaster.NewListenChan()
+			defer stopListening()
+			if err := target.Driver.HandleEvents(p, listenChan); err != nil {
+				stopListening()
+				//				broadcaster.Close() Uncomment to stop emission
+				//TODO error handling
+			}
+		}()
 	}
 
-	// Start targets in parallel
+	// Start source
 	go func() {
-		defer close(errChan)
-		var wg sync.WaitGroup
-		for idx, target := range p.Targets {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if err := target.Driver.HandleEvents(p, targetEventsChans[idx], context.Background()); err != nil {
-					errChan <- err
-				}
-
-			}()
+		defer broadcaster.In().Finish()
+		if err := p.Source.Driver.GetDocumentsForProcessor(p, broadcaster.In(), 0); err != nil {
+			fmt.Println("error in getting documents for processor")
 		}
-		wg.Wait()
 	}()
-	for {
-		select {
-		case doc, open := <-docChan:
-			if !open {
-				// Send end signal
-				for _, targetEventChan := range targetEventsChans {
-					close(targetEventChan)
-				}
 
-				// Wait for all closed or err
-				return <-errChan
-			}
-
-			// Dispatch across different targets
-			for _, targetEventChan := range targetEventsChans {
-				event := &TargetInsertEvent{
-					Pkey: doc.Pkey,
-					Json: doc.Json,
-				}
-				targetEventChan <- event
-			}
-
-		case err, opened := <-errChan:
-			if !opened {
-				return nil
-			}
-			if err != nil {
-				// TODO STOP docChan
-				for _, targetEventChan := range targetEventsChans {
-					close(targetEventChan)
-				}
-				<-errChan
-				return err
-			}
-		}
-	}
+	broadcaster.Wait()
+	return nil
 }

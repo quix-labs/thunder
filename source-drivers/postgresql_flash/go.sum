@@ -39,8 +39,6 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/quix-labs/flash v0.0.0-20240715105610-d3fe20e10139 h1:7X1kG0XvyNUWmOIx/AuBeO7+RgnCZabigvghO3JXM+U=
 github.com/quix-labs/flash v0.0.0-20240715105610-d3fe20e10139/go.mod h1:SCqQYauUkqCkGRLkTbOCrdHkPapkFyW0V2mFOLKrpPg=
-github.com/quix-labs/flash/drivers/trigger v0.0.0-20240715105610-d3fe20e10139 h1:v3GkbFy8vzbHBiCuDf0hi/nk+5bC6Jv6bl922ihOIuE=
-github.com/quix-labs/flash/drivers/trigger v0.0.0-20240715105610-d3fe20e10139/go.mod h1:dGWH7uQIw3z0/k35wDOWYhjnaSv1vrjRSm9USBfQvnw=
 github.com/quix-labs/flash/drivers/wal_logical v0.0.0-20240715105610-d3fe20e10139 h1:N6Z64MJUOJUhf3b8jMp1qTpiYc09JW05Cr7xiDyyOok=
 github.com/quix-labs/flash/drivers/wal_logical v0.0.0-20240715105610-d3fe20e10139/go.mod h1:n0xGiijU1pdzPE1SoIGpepYXwDlitg18pPsS+zNJSL4=
 github.com/rs/xid v1.5.0/go.mod h1:trrq9SKmegXys3aeAKXMUTdJsYXVwGY3RLcfgqegfbg=

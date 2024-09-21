@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/quix-labs/flash"
 	"github.com/quix-labs/flash/drivers/wal_logical"
-	_ "github.com/quix-labs/flash/drivers/wal_logical"
 	"github.com/quix-labs/thunder"
+	"github.com/quix-labs/thunder/utils"
 	"strconv"
 	"time"
 )
@@ -80,27 +80,29 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 	return &stats, nil
 }
 
-func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, docChan chan<- *thunder.Document, errChan chan error, limit uint64) {
-	conn, err := d.newConn()
-	if err != nil {
-		errChan <- err
-		return
-	}
-	defer conn.Close(context.Background())
-
+func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, in utils.BroadcasterIn[*thunder.Document], limit uint64) error {
 	query, err := GetSqlForProcessor(processor)
 	if err != nil {
-		errChan <- err
-		return
+		return err
 	}
 	if limit > 0 {
 		query = fmt.Sprintf("%s LIMIT %s", query, strconv.FormatUint(limit, 10))
 	}
 
-	GetResultsInChan[thunder.Document](conn, query, false, docChan, errChan)
+	conn, err := d.newConn()
+	if err != nil {
+		return err
+	}
+	defer conn.Close(context.Background())
+
+	if err := GetResult[thunder.Document](conn, query, in); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, ctx context.Context) error {
+func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEvent]) error {
 
 	publicationSlotPrefix := "thunder_p" + strconv.Itoa(p.ID)
 	replicationSlot := "thunder_replication_p" + strconv.Itoa(p.ID)
@@ -139,9 +141,6 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 			PublicationSlotPrefix: publicationSlotPrefix,
 			ReplicationSlot:       replicationSlot,
 		}),
-		//Driver: trigger.NewDriver(&trigger.DriverConfig{
-		//	Schema: publicationSlotPrefix,
-		//}),
 	})
 
 	// Register all listener
@@ -157,6 +156,7 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 		if err != nil {
 			return err
 		}
+
 		// Handle root table changes
 		if relation == nil {
 			// TODO OFF GRACEFULL SHUTDOWN
@@ -168,7 +168,7 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 						listenerErrChan <- err
 						return
 					}
-					eventsChan <- &thunder.DbInsertEvent{Pkey: pkey}
+					in.Broadcast(&thunder.DbInsertEvent{Pkey: pkey})
 				case *flash.UpdateEvent:
 					pkey, err := ExtractPkeyFromMap(config.PrimaryKeys, *typedEvent.Old)
 					if err != nil {
@@ -180,16 +180,16 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 						listenerErrChan <- err
 						return
 					}
-					eventsChan <- &thunder.DbPatchEvent{Pkey: pkey, JsonPatch: jsonPatch}
+					in.Broadcast(&thunder.DbPatchEvent{Pkey: pkey, JsonPatch: jsonPatch})
 				case *flash.DeleteEvent:
 					pkey, err := ExtractPkeyFromMap(config.PrimaryKeys, *typedEvent.Old)
 					if err != nil {
 						listenerErrChan <- err
 						return
 					}
-					eventsChan <- &thunder.DbDeleteEvent{Pkey: pkey}
+					in.Broadcast(&thunder.DbDeleteEvent{Pkey: pkey})
 				case *flash.TruncateEvent:
-					eventsChan <- &thunder.DbTruncateEvent{}
+					in.Broadcast(&thunder.DbTruncateEvent{})
 				}
 			})
 			if err != nil {
@@ -214,16 +214,16 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 					return
 				}
 
-				eventsChan <- &thunder.DbPatchEvent{
+				in.Broadcast(&thunder.DbPatchEvent{
 					Relation:  relation,
 					Pkey:      pkey,
 					JsonPatch: jsonPatch,
-				}
+				})
 
 			case *flash.TruncateEvent:
-				eventsChan <- &thunder.DbTruncateEvent{
+				in.Broadcast(&thunder.DbTruncateEvent{
 					Relation: relation,
-				}
+				})
 
 			case *flash.DeleteEvent:
 				pkey, err := ExtractPkeyFromMap(config.PrimaryKeys, *typedEvent.Old)
@@ -232,12 +232,11 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 					return
 				}
 
-				eventsChan <- &thunder.DbDeleteEvent{
+				in.Broadcast(&thunder.DbDeleteEvent{
 					Relation: relation,
 					Pkey:     pkey,
-				}
+				})
 			}
-
 		})
 		if err != nil {
 			return err
@@ -250,19 +249,19 @@ func (d *Driver) Start(p *thunder.Processor, eventsChan chan<- thunder.DbEvent, 
 	go func() {
 		errChan <- flashClient.Start()
 	}()
+	defer flashClient.Close()
 
 	// Start listening
 	for {
 		select {
-		case <-ctx.Done():
-			if err := flashClient.Close(); err != nil {
-				return err
-			}
-			return ctx.Err()
 		case err := <-errChan:
 			return err
 		case err := <-listenerErrChan:
 			return err
+		default:
+			if in.Closed() {
+				return nil
+			}
 		}
 	}
 }

@@ -14,6 +14,8 @@ replace github.com/quix-labs/thunder/modules/http_server => ../modules/http_serv
 
 replace github.com/quix-labs/thunder/modules/api => ../modules/api
 
+replace github.com/quix-labs/thunder/utils => ../utils
+
 require (
 	github.com/quix-labs/thunder v0.0.0-00010101000000-000000000000
 	github.com/quix-labs/thunder/modules/api v0.0.0-00010101000000-000000000000
@@ -39,6 +41,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/quix-labs/flash v0.0.0-20240715105610-d3fe20e10139 // indirect
 	github.com/quix-labs/flash/drivers/wal_logical v0.0.0-20240715105610-d3fe20e10139 // indirect
+	github.com/quix-labs/thunder/utils v0.0.0-00010101000000-000000000000 // indirect
 	github.com/rs/zerolog v1.33.0 // indirect
 	go.opentelemetry.io/otel v1.24.0 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect

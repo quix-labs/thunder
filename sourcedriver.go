@@ -1,9 +1,9 @@
 package thunder
 
 import (
-	"context"
 	"encoding/json"
 	"github.com/creasty/defaults"
+	"github.com/quix-labs/thunder/utils"
 	"reflect"
 )
 
@@ -32,11 +32,11 @@ type SourceDriver interface {
 	TestConfig() (string, error) // TODO USELESS REPLACE IN FAVOR OF STATS TO CHECK NOT EMPTY
 	Stats() (*SourceDriverStats, error)
 
-	GetDocumentsForProcessor(processor *Processor, docChan chan<- *Document, errChan chan error, limit uint64)
+	GetDocumentsForProcessor(processor *Processor, in utils.BroadcasterIn[*Document], limit uint64) error
 
 	// Real Time Indexing
 
-	Start(processor *Processor, eventsChan chan<- DbEvent, ctx context.Context) error
+	Start(processor *Processor, in utils.BroadcasterIn[DbEvent]) error
 	Stop() error
 }
 

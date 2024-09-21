@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
+	"github.com/quix-labs/thunder/utils"
 	"log"
 	"net/http"
 	"strconv"
@@ -83,18 +84,28 @@ func testProcessor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TRY TO FETCH 1 DOCUMENT
-	var docChan = make(chan *thunder.Document, 1)
-	var errChan = make(chan error, 1)
+	// Start indexing
+	broadcaster := utils.NewBroadcaster[*thunder.Document, *thunder.Document](func(doc *thunder.Document) *thunder.Document {
+		return doc
+	})
+	broadcaster.Start()
+	defer broadcaster.Close()
 
+	var errChan = make(chan error)
+
+	// Start source
 	go func() {
-		defer close(docChan)
-		defer close(errChan)
-		processor.Source.Driver.GetDocumentsForProcessor(processor, docChan, errChan, 1)
+		defer broadcaster.In().Finish()
+		if err := processor.Source.Driver.GetDocumentsForProcessor(processor, broadcaster.In(), 1); err != nil {
+			errChan <- err
+		}
 	}()
 
+	// Start receiver
+	listenChan, _ := broadcaster.NewListenChan()
+
 	select {
-	case doc, open := <-docChan:
+	case doc, open := <-listenChan:
 		if !open {
 			writeJsonResponse(w, http.StatusOK, nil)
 			return

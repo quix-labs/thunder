@@ -8,6 +8,7 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v5"
 	"github.com/quix-labs/thunder"
+	"github.com/quix-labs/thunder/utils"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -222,6 +223,27 @@ func GetResultsSync[T any](conn *pgx.Conn, query string, timeout time.Duration, 
 		}
 	}
 }
+
+func GetResult[T any](conn *pgx.Conn, query string, in utils.BroadcasterIn[*T]) error {
+	result, err := conn.Query(context.Background(), query)
+	if err != nil {
+		return err
+	}
+	defer result.Close()
+
+	for result.Next() {
+		document, err := pgx.RowToStructByName[T](result)
+		if err != nil {
+			return err
+		}
+		if in.Broadcast(&document) == false {
+			return nil
+		}
+	}
+
+	return nil
+}
+
 func GetResultsInChan[T any](conn *pgx.Conn, query string, withIntermediateView bool, resultsChan chan<- *T, errorChan chan error) {
 	if withIntermediateView {
 		// CAN BE USEFUL IF USER WANT A PREVIEW

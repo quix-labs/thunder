@@ -60,10 +60,8 @@ func Start() error {
 		//}
 		processorsWg.Add(1)
 		go func() {
-			defer func() {
-				processorsWg.Done()
-				fmt.Println("processor stopped")
-			}()
+			defer processorsWg.Done()
+
 			err := p.Start()
 			if err != nil && !errors.Is(err, context.Canceled) {
 				processorErrChan <- err
