@@ -136,6 +136,7 @@ func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEv
 
 	// START LISTENING
 	flashClient, _ := flash.NewClient(&flash.ClientConfig{
+		Logger:      thunder.GetLoggerForSourceDriver(&Driver{}),
 		DatabaseCnx: "postgresql://devuser:devpass@localhost:5432/devdb",
 		Driver: wal_logical.NewDriver(&wal_logical.DriverConfig{
 			PublicationSlotPrefix: publicationSlotPrefix,

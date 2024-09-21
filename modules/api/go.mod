@@ -3,6 +3,7 @@ module github.com/quix-labs/thunder/modules/api
 go 1.23.0
 
 replace github.com/quix-labs/thunder => ../../
+replace github.com/quix-labs/thunder/utils => ../../utils
 
 replace github.com/quix-labs/thunder/modules/http_server => ../http_server
 

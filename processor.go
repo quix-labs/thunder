@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/quix-labs/thunder/utils"
+	"github.com/rs/zerolog"
+	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -168,4 +171,9 @@ func (p *Processor) FullIndex() error {
 
 	broadcaster.Wait()
 	return nil
+}
+
+func GetLoggerForProcessor(p *Processor) *zerolog.Logger {
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Str("processor", strconv.Itoa(p.ID)).Stack().Timestamp().Logger()
+	return &logger
 }

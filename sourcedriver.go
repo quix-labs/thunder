@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"github.com/creasty/defaults"
 	"github.com/quix-labs/thunder/utils"
+	"github.com/rs/zerolog"
+	"os"
 	"reflect"
 )
 
@@ -83,4 +85,9 @@ func ConvertSourceDriverConfig(driver *SourceDriverInfo, config any) (any, error
 	}
 
 	return typedConfig, nil
+}
+
+func GetLoggerForSourceDriver(s SourceDriver) *zerolog.Logger {
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Str("source-driver", s.DriverInfo().ID).Stack().Timestamp().Logger()
+	return &logger
 }

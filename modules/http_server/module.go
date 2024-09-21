@@ -2,7 +2,6 @@ package http_server
 
 import (
 	"errors"
-	"fmt"
 	"github.com/quix-labs/thunder"
 	"net/http"
 )
@@ -39,10 +38,12 @@ func (m *Module) Start() error {
 		errChan <- nil
 	}()
 
-	fmt.Println("http server listening on", srv.Addr)
+	thunder.GetLoggerForModule(&Module{}).Info().Msgf("start listening on %s", srv.Addr)
+
 	return <-errChan
 }
 func (m *Module) Stop() error {
+	thunder.GetLoggerForModule(&Module{}).Info().Msg("stop listening")
 	return nil
 }
 

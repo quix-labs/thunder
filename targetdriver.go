@@ -1,5 +1,10 @@
 package thunder
 
+import (
+	"github.com/rs/zerolog"
+	"os"
+)
+
 type TargetDriverInfo struct {
 	ID  string                                 `json:"ID"`
 	New func(config any) (TargetDriver, error) `json:"-"`
@@ -45,3 +50,8 @@ type TargetTruncateEvent struct {
 }
 
 type TargetEvent any // TargetDeleteEvent | TargetInsertEvent | TargetPatchEvent | TargetTruncateEvent
+
+func GetLoggerForTargetDriver(t TargetDriver) *zerolog.Logger {
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Str("target-driver", t.DriverInfo().ID).Stack().Timestamp().Logger()
+	return &logger
+}

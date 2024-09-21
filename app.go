@@ -74,7 +74,6 @@ func Start() error {
 
 	select {
 	case <-ctx.Done():
-		fmt.Println("TODO GRACEFULL SHUTDOWN")
 	case err := <-processorErrChan:
 		return err
 	case err := <-moduleErrChan:
@@ -83,6 +82,14 @@ func Start() error {
 
 	// STOP ALL PROCESSORS
 	for _, p := range GetProcessors() {
+		err := p.Stop()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// STOP ALL MODULES
+	for _, p := range app.loadedModules {
 		err := p.Stop()
 		if err != nil {
 			panic(err)
