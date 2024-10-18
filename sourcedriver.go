@@ -34,6 +34,7 @@ type SourceDriver interface {
 	TestConfig() (string, error) // TODO USELESS REPLACE IN FAVOR OF STATS TO CHECK NOT EMPTY
 	Stats() (*SourceDriverStats, error)
 
+	// GetDocumentsForProcessor use limit=0 to unlimited
 	GetDocumentsForProcessor(processor *Processor, in utils.BroadcasterIn[*Document], limit uint64) error
 
 	// Real Time Indexing

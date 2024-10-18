@@ -168,12 +168,17 @@
           Add Simple Fields
         </UButton>
       </div>
-      <div>
 
-        <UButton trailing-icon="i-heroicons-plus" @click.prevent.stop="addRelation">
-          Add Relation
-        </UButton>
-      </div>
+
+      <UButton trailing-icon="i-heroicons-plus" @click.prevent.stop="addAllFields">
+        Add all fields
+      </UButton>
+
+
+      <UButton trailing-icon="i-heroicons-plus" @click.prevent.stop="addRelation">
+        Add Relation
+      </UButton>
+
     </div>
   </div>
 </template>
@@ -220,6 +225,10 @@ const addSimpleFields = () => {
   tempSimpleField.value = []
 };
 
+const addAllFields = () => {
+  mapping.value = [...mapping.value || [], ...availableSimpleFields.value?.map(i => ({_type: 'simple', column: i}))]
+
+}
 const addRelation = () => {
   mapping.value.push({
     _type: 'relation',

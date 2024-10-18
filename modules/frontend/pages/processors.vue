@@ -24,10 +24,14 @@
               ]]" @click.stop>
                 <UButton icon="i-heroicons-ellipsis-horizontal" variant="link" color="gray" size="xl" :padded="false"/>
               </UDropdown>
+
               <UButton icon="i-heroicons-eye" variant="link" color="gray" size="xl" :padded="false"
                        @click.stop.prevent="showProcessor(row.id)"/>
               <UButton icon="i-heroicons-pencil-square" variant="link" color="gray" size="xl" :padded="false"
                        @click.stop.prevent="editProcessor(row.id)"/>
+
+              <UButton icon="i-heroicons-document-arrow-down" variant="link" color="primary" size="xl" :padded="false"
+                       @click.stop.prevent="openDownloadModal(row.id)"/>
               <UButton icon="i-heroicons-trash" variant="link" color="red" size="xl" :padded="false"
                        @click.stop.prevent="deleteProcessor(row.id)"/>
             </div>
@@ -70,6 +74,8 @@
 
 <script setup lang="ts">
 
+import {LazyModalDownloadProcessor} from "#components";
+
 const {status, data: processors} = useProcessors()
 
 // Table
@@ -77,10 +83,10 @@ const columns = [
   {key: 'id', label: '#', sortable: true, rowClass: 'w-[1px] whitespace-nowrap'},
   {key: 'source', label: 'Source', sortable: true},
   {key: 'index', label: 'Index', sortable: true},
-  {key: 'targets', label: 'Targets', sortable: false},
+  {key: 'targets', label: 'Targets', sortable: true},
   {key: 'stats', label: 'Stats', sortable: false},
-  {key: 'listening', label: 'Listening', sortable: false},
-  {key: 'indexing', label: 'Indexing', sortable: false},
+  {key: 'listening', label: 'Listening', sortable: true},
+  {key: 'indexing', label: 'Indexing', sortable: true},
   {key: 'actions', sortable: false, rowClass: 'w-[1px] whitespace-nowrap'}
 ]
 
@@ -146,6 +152,11 @@ const deleteProcessor = async (id: number) => {
     const serverData = data.value as { message?: string }
     useToast().add({color: "green", title: "Successfully deleted processor", description: serverData.message})
   }
+}
+
+const openDownloadModal = (id: number) => {
+  const modal = useModal()
+  modal.open(LazyModalDownloadProcessor, {processorId: id})
 }
 
 const claimIndex = (id: number) => {

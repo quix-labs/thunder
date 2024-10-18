@@ -309,14 +309,14 @@ func ExtractPkeyFromMap(keys []string, target map[string]any) (string, error) {
 					convertedValue := val.Convert(targetType).Interface()
 					result[idx] = convertedValue.(string)
 				} else {
-					return "", fmt.Errorf("value for key %s cannot be converted to type %T", key, result[idx])
+					return "", fmt.Errorf("value for key %s cannot be converted to type %In", key, result[idx])
 				}
 			}
 		} else if val.Type().ConvertibleTo(targetType) {
 			convertedValue := val.Convert(targetType).Interface()
 			result[idx] = convertedValue.(string)
 		} else {
-			return "", fmt.Errorf("value for key %s cannot be converted to type %T", key, result[idx])
+			return "", fmt.Errorf("value for key %s cannot be converted to type %In", key, result[idx])
 		}
 	}
 

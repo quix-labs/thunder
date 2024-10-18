@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"github.com/quix-labs/thunder"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
@@ -23,6 +25,8 @@ func ProcessorRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /go-api/processors/{id}/index", indexProcessor)
 	mux.HandleFunc("POST /go-api/processors/{id}/start", startProcessor)
 	mux.HandleFunc("POST /go-api/processors/{id}/stop", stopProcessor)
+
+	mux.HandleFunc("GET /go-api/processors/{id}/download", downloadProcessor)
 
 }
 
@@ -300,4 +304,92 @@ func stopProcessor(w http.ResponseWriter, r *http.Request) {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, fmt.Sprintf("Processor %d stopped", id)})
+}
+
+func downloadProcessor(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
+		return
+	}
+
+	processor, err := thunder.GetProcessor(id)
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, err, "")
+		return
+	}
+
+	format := r.FormValue("format")
+	if format == "" {
+		format = "csv"
+	}
+
+	filename := r.FormValue("filename")
+	if filename == "" {
+		filename = fmt.Sprintf("processor-%d.%s", id, format)
+	}
+
+	// Send download file header
+	w.Header().Set("content-disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	w.Header().Set("content-transfer-encoding", "binary")
+	w.Header().Set("transfer-encoding", "chunked")
+	w.Header().Set("accept-ranges", "bytes")
+	w.Header().Set("cache-control", "private")
+	w.Header().Set("pragma", "private")
+
+	// Start indexing
+	broadcaster := utils.NewBroadcaster[*thunder.Document, *thunder.Document](func(doc *thunder.Document) *thunder.Document {
+		return doc
+	})
+	broadcaster.Start()
+	defer broadcaster.Close()
+
+	// Start receiver
+	listenChan, stopListening := broadcaster.NewListenChan()
+	writed := make(chan struct{})
+	switch format {
+	case "json":
+		go func() {
+			w.Header().Set("content-type", "application/json")
+			w.Write([]byte("["))
+			var i atomic.Uint64
+			for doc := range listenChan {
+				if i.Load() > 0 {
+					w.Write([]byte(","))
+				}
+
+				w.Write(doc.Json)
+			}
+			w.Write([]byte("]"))
+			writed <- struct{}{}
+		}()
+		break
+	case "csv":
+		go func() {
+			w.Header().Set("content-type", "text/csv")
+
+			csvWriter := csv.NewWriter(w)
+			csvWriter.Write([]string{"pkey", "json"})
+
+			for doc := range listenChan {
+				csvWriter.Write([]string{doc.Pkey, string(doc.Json)})
+			}
+
+			writed <- struct{}{}
+		}()
+		break
+	default:
+		writeJsonError(w, http.StatusBadRequest, errors.New(fmt.Sprintf("unsupported format: %s", format)), "")
+		return
+	}
+
+	// Start source
+	if err := processor.Source.Driver.GetDocumentsForProcessor(processor, broadcaster.In(), 0); err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+	}
+
+	broadcaster.In().Finish()
+	stopListening()
+
+	<-writed
 }

@@ -6,6 +6,7 @@
       <NuxtPage/>
     </UContainer>
     <UNotifications :ui="{  position: 'start-1/2 -translate-x-1/2'}"/>
+    <UModals/>
   </div>
 </template>
 

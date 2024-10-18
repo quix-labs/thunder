@@ -45,11 +45,11 @@ func (i *broadcasterIn[T]) Finish() {
 	i._inputMu.Unlock()
 }
 
-type BroadcastProcessor[T any, V any] func(in T) (out V)
+type BroadcastProcessor[In any, Out any] func(in In) (out Out)
 
-type Broadcaster[T any, V any] struct {
-	in        *broadcasterIn[T]
-	processor BroadcastProcessor[T, V]
+type Broadcaster[In any, Out any] struct {
+	in        *broadcasterIn[In]
+	processor BroadcastProcessor[In, Out]
 
 	listenerCtx    context.Context
 	listenerCancel context.CancelFunc
@@ -59,8 +59,8 @@ type Broadcaster[T any, V any] struct {
 	_once sync.Once
 }
 
-func (b *Broadcaster[T, V]) NewListenChan() (<-chan V, func()) {
-	listenChan := make(chan V)
+func (b *Broadcaster[In, Out]) NewListenChan() (<-chan Out, func()) {
+	listenChan := make(chan Out)
 
 	b.listenChannels.Store(listenChan, true)
 	return listenChan, func() {
@@ -69,11 +69,11 @@ func (b *Broadcaster[T, V]) NewListenChan() (<-chan V, func()) {
 	}
 }
 
-func (b *Broadcaster[T, V]) In() BroadcasterIn[T] {
+func (b *Broadcaster[In, Out]) In() BroadcasterIn[In] {
 	return b.in
 }
 
-func (b *Broadcaster[T, V]) Start() {
+func (b *Broadcaster[In, Out]) Start() {
 	go func() {
 		for data := range b.in._inputChan {
 			transformedData := b.processor(data)
@@ -88,7 +88,7 @@ func (b *Broadcaster[T, V]) Start() {
 						}
 					}()
 
-					if ch, ok := key.(chan V); ok {
+					if ch, ok := key.(chan Out); ok {
 						ch <- transformedData
 					}
 				}(key)
@@ -100,14 +100,14 @@ func (b *Broadcaster[T, V]) Start() {
 	}()
 }
 
-func (b *Broadcaster[T, V]) Close() {
+func (b *Broadcaster[In, Out]) Close() {
 	b._once.Do(func() {
 		b.in.Finish()
 		b.Wait()
 	})
 }
 
-func (b *Broadcaster[T, V]) Wait() {
+func (b *Broadcaster[In, Out]) Wait() {
 
 	// Wait for input end
 	for !b.in.Closed() {

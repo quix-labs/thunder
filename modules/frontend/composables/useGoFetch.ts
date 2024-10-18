@@ -1,7 +1,10 @@
 import {joinURL} from "ufo";
 
+export const getGoApiUrl = (path?: string) => {
+    return joinURL('/go-api', path || "")
+}
+
 const useGoFetch: typeof useFetch = (path, options = {}) => {
-    const fullPath = joinURL('/go-api', path.toString())
-    return useFetch(fullPath, {server:false,...options,lazy:true})
+    return useFetch(getGoApiUrl(path.toString()), {server: false, ...options, lazy: true})
 }
 export default useGoFetch
