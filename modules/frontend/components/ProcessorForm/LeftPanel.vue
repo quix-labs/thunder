@@ -1,12 +1,12 @@
 <template>
-  <div class="flex flex-col flex-1 gap-y-4 max-h-screen overflow-auto p-4">
+  <div class="flex flex-col flex-1 gap-y-4 p-4">
     <!-- SOURCE -->
     <UCard
         tabindex="0"
         class="cursor-pointer"
+        :class="state.activeTabs==='source' ? 'ring-1 ring-[var(--ui-primary)]' : undefined"
         @click.prevent="selectTab('source')"
         @keydown.enter.space="selectTab('source')"
-        :ui="state.activeTabs==='source' ? {ring:'ring-1 ring-primary dark:ring-primary'} : undefined"
     >
       <template #header>
         <p class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
@@ -28,9 +28,9 @@
     <UCard
         tabindex="0"
         class="flex-1 cursor-pointer"
+        :class="state.activeTabs==='mapping' ? 'ring-1 ring-[var(--ui-primary)]' : undefined"
         @click.prevent="selectTab('mapping')"
         @keydown.enter.space="selectTab('mapping')"
-        :ui="state.activeTabs==='mapping' ? {ring:'ring-1 ring-primary dark:ring-primary'} : undefined"
     >
       <template #header>
         <p class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
@@ -47,9 +47,9 @@
     <UCard
         tabindex="0"
         class="cursor-pointer"
+        :class="state.activeTabs==='output' ? 'ring-1 ring-[var(--ui-primary)]' : undefined"
         @click.prevent="selectTab('output')"
         @keydown.enter.space="selectTab('output')"
-        :ui="state.activeTabs==='output' ? {ring:'ring-1 ring-primary dark:ring-primary'} : undefined"
     >
       <template #header>
         <p class="text-base font-semibold leading-6 text-gray-900 dark:text-white">

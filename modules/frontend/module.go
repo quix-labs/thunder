@@ -7,22 +7,24 @@ import (
 	"net/http"
 )
 
+const ModuleID = "thunder.frontend"
+
 func init() {
-	thunder.RegisterModule(&Module{})
+	thunder.Modules.Register(ModuleID, &Module{})
 	http_server.RegisterHandler(&Module{})
 }
 
 type Module struct{}
 
-func (m *Module) ThunderModule() thunder.ModuleInfo {
-	return thunder.ModuleInfo{
-		ID:  "thunder.frontend",
-		New: func() thunder.Module { return new(Module) },
-		RequiredModules: []string{
-			"thunder.http_server",
-			"thunder.api",
-		},
+func (m *Module) RequiredModules() []string {
+	return []string{
+		"thunder.http_server",
+		"thunder.api",
 	}
+}
+
+func (m *Module) New() thunder.Module {
+	return new(Module)
 }
 
 func (m *Module) HandleRoutes(mux *http.ServeMux) {

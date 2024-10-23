@@ -38,6 +38,7 @@ func writeJsonError(w http.ResponseWriter, statusCode int, error error, message 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
+
 	_, err = w.Write(marshal)
 	if err != nil {
 		log.Println(err)

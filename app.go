@@ -8,7 +8,7 @@ import (
 )
 
 type App struct {
-	loadedModules []Module
+	loadedModules map[string]Module
 
 	// Used by module to handle app events
 	broadcaster any
@@ -29,24 +29,25 @@ func Start() error {
 	}
 
 	// Load Modules
-	modules := GetModules()
-	app.loadedModules = make([]Module, len(modules))
+	modules := Modules.All()
+	app.loadedModules = make(map[string]Module, len(modules))
+
 	moduleErrChan := make(chan error)
-	for index, moduleInfo := range modules {
+	for moduleID, module := range modules {
 		// Check dependencies
-		for _, requiredModule := range moduleInfo.RequiredModules {
-			if _, err := GetModule(requiredModule); err != nil {
-				return fmt.Errorf(`module "%s" depends on missing module "%s"`, moduleInfo.ID, requiredModule)
+		for _, requiredModule := range module.RequiredModules() {
+			if _, err := Modules.Get(requiredModule); err != nil {
+				return fmt.Errorf(`module "%s" depends on missing module "%s"`, moduleID, requiredModule)
 			}
 		}
-
-		app.loadedModules[index] = moduleInfo.New()
+		moduleInstance := module.New()
 		go func() {
-			err := app.loadedModules[index].Start()
+			err := moduleInstance.Start()
 			if err != nil {
 				moduleErrChan <- err
 			}
 		}()
+		app.loadedModules[moduleID] = moduleInstance
 	}
 
 	//var processorsWg sync.WaitGroup
@@ -79,7 +80,7 @@ func Start() error {
 	}
 
 	// STOP ALL PROCESSORS
-	for _, p := range GetProcessors() {
+	for _, p := range Processors.All() {
 		err := p.Stop()
 		if err != nil {
 			panic(err)

@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"github.com/quix-labs/thunder"
@@ -9,7 +8,7 @@ import (
 	"github.com/quix-labs/thunder/utils"
 	"log"
 	"net/http"
-	"strconv"
+	"os"
 	"sync/atomic"
 	"time"
 )
@@ -33,9 +32,9 @@ func ProcessorRoutes(mux *http.ServeMux) {
 type ProcessorApiDetails struct {
 	Indexing    bool                `json:"indexing"`
 	Listening   bool                `json:"listening"`
-	ID          int                 `json:"id"`
-	Source      int                 `json:"source"`  // as source_id
-	Targets     []int               `json:"targets"` // as targets_id
+	ID          string              `json:"id"`
+	Source      string              `json:"source"` // as source_id
+	Targets     []string            `json:"targets"`
 	Table       string              `json:"table"`
 	PrimaryKeys []string            `json:"primary_keys"`
 	Conditions  []thunder.Condition `json:"conditions"`
@@ -45,9 +44,8 @@ type ProcessorApiDetails struct {
 }
 
 func listProcessors(w http.ResponseWriter, r *http.Request) {
-	processors := thunder.GetProcessors()
 	var res []ProcessorApiDetails
-	for _, processor := range processors {
+	for _, processor := range thunder.Processors.All() {
 		serializedProcessor, err := thunder.SerializeProcessor(processor)
 		if err != nil {
 			writeJsonError(w, http.StatusInternalServerError, err, "")
@@ -150,8 +148,7 @@ func createProcessor(w http.ResponseWriter, r *http.Request) {
 		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
-	processor.ID = 0
-	if err := thunder.AddProcessor(processor); err != nil {
+	if err := thunder.Processors.Register("", processor); err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
@@ -166,14 +163,10 @@ func createProcessor(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateProcessor(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
+	id := r.PathValue("id")
 
 	var s thunder.JsonProcessor
-	err = http_server.DecodeJSONBody(w, r, &s)
+	err := http_server.DecodeJSONBody(w, r, &s)
 	if err != nil {
 		var mr *http_server.MalformedRequest
 		if errors.As(err, &mr) {
@@ -191,7 +184,7 @@ func updateProcessor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := thunder.UpdateProcessor(id, newProcessor); err != nil {
+	if err := thunder.Processors.Update(id, newProcessor); err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
@@ -208,24 +201,16 @@ func updateProcessor(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteProcessor(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
-
-	err = thunder.DeleteProcessor(id)
-	if err != nil {
+	id := r.PathValue("id")
+	if err := thunder.Processors.Delete(id); err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	err = thunder.SaveConfig()
-	if err != nil {
+	if err := thunder.SaveConfig(); err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-
 	writeJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
@@ -233,13 +218,8 @@ func deleteProcessor(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexProcessor(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
-
-	processor, err := thunder.GetProcessor(id)
+	id := r.PathValue("id")
+	processor, err := thunder.Processors.Get(id)
 	if err != nil {
 		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
@@ -258,13 +238,8 @@ func indexProcessor(w http.ResponseWriter, r *http.Request) {
 }
 
 func startProcessor(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
-
-	processor, err := thunder.GetProcessor(id)
+	id := r.PathValue("id")
+	processor, err := thunder.Processors.Get(id)
 	if err != nil {
 		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
@@ -284,13 +259,8 @@ func startProcessor(w http.ResponseWriter, r *http.Request) {
 }
 
 func stopProcessor(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
-
-	processor, err := thunder.GetProcessor(id)
+	id := r.PathValue("id")
+	processor, err := thunder.Processors.Get(id)
 	if err != nil {
 		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
@@ -307,35 +277,29 @@ func stopProcessor(w http.ResponseWriter, r *http.Request) {
 }
 
 func downloadProcessor(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
+	id := r.PathValue("id")
 
-	processor, err := thunder.GetProcessor(id)
+	processor, err := thunder.Processors.Get(id)
 	if err != nil {
 		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
-	format := r.FormValue("format")
-	if format == "" {
-		format = "csv"
+	exporter := r.FormValue("exporter")
+	if exporter == "" {
+		exporter = "csv"
 	}
 
 	filename := r.FormValue("filename")
 	if filename == "" {
-		filename = fmt.Sprintf("processor-%d.%s", id, format)
+		filename = fmt.Sprintf("processor-%d.%s", id, exporter)
 	}
 
-	// Send download file header
-	w.Header().Set("content-disposition", fmt.Sprintf("attachment; filename=%s", filename))
-	w.Header().Set("content-transfer-encoding", "binary")
-	w.Header().Set("transfer-encoding", "chunked")
-	w.Header().Set("accept-ranges", "bytes")
-	w.Header().Set("cache-control", "private")
-	w.Header().Set("pragma", "private")
+	exporterInstance, err := thunder.Exporters.Get(exporter)
+	if err != nil {
+		writeJsonError(w, http.StatusBadRequest, err, fmt.Sprintf("invalid exporter: %s", exporter))
+		return
+	}
 
 	// Start indexing
 	broadcaster := utils.NewBroadcaster[*thunder.Document, *thunder.Document](func(doc *thunder.Document) *thunder.Document {
@@ -344,52 +308,92 @@ func downloadProcessor(w http.ResponseWriter, r *http.Request) {
 	broadcaster.Start()
 	defer broadcaster.Close()
 
-	// Start receiver
-	listenChan, stopListening := broadcaster.NewListenChan()
-	writed := make(chan struct{})
-	switch format {
-	case "json":
-		go func() {
-			w.Header().Set("content-type", "application/json")
-			w.Write([]byte("["))
-			var i atomic.Uint64
-			for doc := range listenChan {
-				if i.Load() > 0 {
-					w.Write([]byte(","))
-				}
+	// Create temporary file
+	tmpFile, err := os.CreateTemp("", "thunder-")
+	if err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
+		return
+	}
+	defer tmpFile.Close()
+	defer os.Remove(tmpFile.Name())
 
-				w.Write(doc.Json)
-			}
-			w.Write([]byte("]"))
-			writed <- struct{}{}
-		}()
-		break
-	case "csv":
-		go func() {
-			w.Header().Set("content-type", "text/csv")
-
-			csvWriter := csv.NewWriter(w)
-			csvWriter.Write([]string{"pkey", "json"})
-
-			for doc := range listenChan {
-				csvWriter.Write([]string{doc.Pkey, string(doc.Json)})
-			}
-
-			writed <- struct{}{}
-		}()
-		break
-	default:
-		writeJsonError(w, http.StatusBadRequest, errors.New(fmt.Sprintf("unsupported format: %s", format)), "")
+	// Instantiate transformer writer
+	if err := exporterInstance.Load(tmpFile); err != nil {
+		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	// Start source
-	if err := processor.Source.Driver.GetDocumentsForProcessor(processor, broadcaster.In(), 0); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+	// Start receiver
+	listenChan, stopListening := broadcaster.NewListenChan()
+	transformerErrorChan := make(chan error, 1)
+	go func() {
+		defer close(transformerErrorChan)
+		var position atomic.Uint64
+		for doc := range listenChan {
+			position.Add(1)
+			if position.Load() == 1 {
+				if err := exporterInstance.BeforeAll(); err != nil {
+					transformerErrorChan <- err
+					return
+				}
+			}
+
+			if err := exporterInstance.WriteDocument(doc, position.Load()); err != nil {
+				transformerErrorChan <- err
+				return
+			}
+		}
+
+		if position.Load() >= 1 {
+			if err := exporterInstance.AfterAll(); err != nil {
+				transformerErrorChan <- err
+				return
+			}
+		}
+		transformerErrorChan <- nil
+	}()
+
+	sourceErrChan := make(chan error, 1)
+	go func() {
+		defer close(sourceErrChan)
+		sourceErrChan <- processor.Source.Driver.GetDocumentsForProcessor(processor, broadcaster.In(), 0)
+	}()
+
+	for {
+		select {
+		case err := <-sourceErrChan:
+			broadcaster.In().Finish()
+			stopListening()
+			if err != nil {
+				writeJsonError(w, http.StatusInternalServerError, err, "")
+				return
+			}
+
+		case err := <-transformerErrorChan:
+			if err != nil {
+				writeJsonError(w, http.StatusInternalServerError, err, "")
+				broadcaster.In().Finish()
+				stopListening()
+				return
+			}
+
+			// Rewind the temporary file to the beginning
+			if _, err := tmpFile.Seek(0, 0); err != nil {
+				writeJsonError(w, http.StatusInternalServerError, err, "")
+				return
+			}
+
+			// Stream temporary file
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+			w.Header().Set("Cache-Control", "private")
+			w.Header().Set("Pragma", "private")
+
+			if mimeType := exporterInstance.MimeType(); mimeType != "" {
+				w.Header().Set("Content-Type", mimeType)
+			}
+
+			http.ServeContent(w, r, filename, time.Now(), tmpFile)
+			return
+		}
 	}
-
-	broadcaster.In().Finish()
-	stopListening()
-
-	<-writed
 }

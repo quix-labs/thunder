@@ -1,11 +1,10 @@
 package controllers
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
+	"github.com/quix-labs/thunder/utils"
 	"log"
 	"net/http"
 )
@@ -16,8 +15,6 @@ func SourceDriverRoutes(mux *http.ServeMux) {
 }
 
 func testSourceDriver(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	var p struct {
 		Driver string
 		Config map[string]any
@@ -34,70 +31,55 @@ func testSourceDriver(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	driver, err := thunder.GetSourceDriver(p.Driver)
+	driver, err := thunder.SourceDrivers.Get(p.Driver)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
-	configInstance, err := thunder.ConvertToDynamicConfig(&driver.Config, p.Config)
+	config := driver.Config().Config
+	configInstance, err := utils.ConvertToDynamicConfig(config, p.Config)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
+		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	// TRY TEST
 	driverInstance, err := driver.New(configInstance)
 	if err != nil {
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		bytes, _ := json.Marshal(struct {
-			Success bool   `json:"success"`
-			Error   string `json:"error"`
-		}{Success: false, Error: err.Error()})
-		w.Write(bytes)
+		writeJsonError(w, http.StatusUnprocessableEntity, err, "")
 		return
 	}
 
 	message, err := driverInstance.TestConfig()
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		bytes, _ := json.Marshal(struct {
-			Success bool   `json:"success"`
-			Error   string `json:"error"`
-			Message string `json:"message"`
-		}{Success: false, Error: err.Error(), Message: message})
-		w.Write(bytes)
+		writeJsonError(w, http.StatusBadRequest, err, message)
 		return
 	}
-	w.Write([]byte(fmt.Sprintf(`{"success":true,"message":"%s"}`, message)))
+	writeJsonResponse(w, http.StatusOK, struct {
+		Success bool
+		Message string `json:"message"`
+	}{true, message})
 }
 
 type DriverDetails struct {
-	Config *thunder.SourceDriverInfo   `json:"config"`
-	Fields thunder.DynamicConfigFields `json:"fields"`
+	Config *thunder.SourceDriverConfig `json:"config"`
+	Fields utils.DynamicConfigFields   `json:"fields"`
 }
 
 func listSourceDrivers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	registeredDrivers := thunder.GetSourceDrivers()
+	registeredDrivers := thunder.SourceDrivers.All()
 	res := make(map[string]*DriverDetails, len(registeredDrivers))
 
-	for _, driver := range registeredDrivers {
-		res[driver.ID] = &DriverDetails{
-			Config: &driver,
-			Fields: thunder.ParseDynamicConfigFields(&driver.Config),
+	for driverID, driver := range registeredDrivers {
+		driverConfig := driver.Config()
+
+		res[driverID] = &DriverDetails{
+			Config: &driverConfig,
+			Fields: utils.ParseDynamicConfigFields(&driverConfig.Config),
 		}
 	}
-
-	jsonData, err := json.Marshal(res)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(fmt.Sprintf(`{"success":false,"error":"%s"}`, err)))
-		return
-	}
-
-	w.Write(jsonData)
+	writeJsonResponse(w, http.StatusOK, res)
 }

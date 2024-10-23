@@ -3,10 +3,10 @@ package thunder
 import (
 	"errors"
 	"fmt"
+	"github.com/oklog/ulid/v2"
 	"github.com/quix-labs/thunder/utils"
 	"github.com/rs/zerolog"
 	"os"
-	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -17,8 +17,14 @@ type Condition struct {
 	Value    string `json:"value,omitempty"`
 }
 
+var Processors = utils.NewRegistry[*Processor]("processor").SetIdGenerator(func(item **Processor) (string, error) {
+	ulid := ulid.Make().String()
+	(*item).ID = ulid
+	return ulid, nil
+})
+
 type Processor struct {
-	ID int
+	ID string
 
 	Indexing atomic.Bool
 
@@ -50,11 +56,9 @@ func (p *Processor) Start() error {
 	}
 
 	p.Listening.Store(true)
-	GetBroadcaster().Dispatch("processor-updated", p.ID)
 
 	defer func() {
 		p.Listening.Store(false)
-		GetBroadcaster().Dispatch("processor-updated", p.ID)
 	}()
 
 	// Initialize broadcaster
@@ -119,7 +123,6 @@ func (p *Processor) Stop() error {
 		for p.Listening.Load() {
 			time.Sleep(10 * time.Millisecond)
 		}
-		GetBroadcaster().Dispatch("processor-updated", p.ID)
 	}
 
 	return nil
@@ -130,13 +133,7 @@ func (p *Processor) FullIndex() error {
 		return errors.New("processor is already indexing")
 	}
 	p.Indexing.Store(true)
-	GetBroadcaster().Dispatch("processor-updated", p.ID)
-	defer func() {
-		p.Indexing.Store(false)
-		GetBroadcaster().Dispatch("processor-indexed", p.ID)
-		GetBroadcaster().Dispatch("processor-updated", p.ID)
-		//TODO RESTART IF STOPPED NOT WORK
-	}()
+	defer p.Indexing.Store(false)
 
 	// Start indexing
 	broadcaster := utils.NewBroadcaster[*Document, TargetEvent](func(doc *Document) TargetEvent {
@@ -173,7 +170,7 @@ func (p *Processor) FullIndex() error {
 	return nil
 }
 
-func GetLoggerForProcessor(p *Processor) *zerolog.Logger {
-	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Str("processor", strconv.Itoa(p.ID)).Stack().Timestamp().Logger()
+func GetLoggerForProcessor(processor *Processor) *zerolog.Logger {
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Str("processor", processor.ID).Stack().Timestamp().Logger()
 	return &logger
 }

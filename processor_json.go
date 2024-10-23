@@ -1,10 +1,10 @@
 package thunder
 
 type JsonProcessor struct {
-	ID int `json:"ID"`
+	ID string `json:"ID"`
 
-	Source  int   `json:"source"`  // as source_id
-	Targets []int `json:"targets"` // as targets_id
+	Source  string   `json:"source"`  // as source_id
+	Targets []string `json:"targets"` // as targets_id
 
 	Table       string      `json:"table"`
 	PrimaryKeys []string    `json:"primary_keys"`
@@ -17,25 +17,25 @@ type JsonProcessor struct {
 	Enabled bool `json:"enabled"`
 }
 
-func SerializeProcessor(s *Processor) (*JsonProcessor, error) {
-	jsonMapping, err := SerializeMapping(&s.Mapping)
+func SerializeProcessor(p *Processor) (*JsonProcessor, error) {
+	jsonMapping, err := SerializeMapping(&p.Mapping)
 	if err != nil {
 		return nil, err
 	}
 
 	jp := JsonProcessor{
-		ID:          s.ID,
-		Source:      s.Source.ID,
-		Targets:     make([]int, len(s.Targets)),
-		Table:       s.Table,
-		PrimaryKeys: s.PrimaryKeys,
-		Conditions:  s.Conditions,
+		ID:          p.ID,
+		Source:      p.Source.ID,
+		Targets:     make([]string, len(p.Targets)),
+		Table:       p.Table,
+		PrimaryKeys: p.PrimaryKeys,
+		Conditions:  p.Conditions,
 		Mapping:     *jsonMapping,
-		Index:       s.Index,
-		Enabled:     s.Enabled,
+		Index:       p.Index,
+		Enabled:     p.Enabled,
 	}
 
-	for i, target := range s.Targets {
+	for i, target := range p.Targets {
 		jp.Targets[i] = target.ID
 	}
 
@@ -58,20 +58,21 @@ func UnserializeProcessor(jp *JsonProcessor) (*Processor, error) {
 	}
 
 	// Load source
-	source, err := GetSource(jp.Source)
+	source, err := Sources.Get(jp.Source)
 	if err != nil {
 		return nil, err
 	}
-	p.Source = source
+	p.Source = &source
 
 	// Load Targets
 	p.Targets = make([]*Target, len(jp.Targets))
+
 	for idx, targetId := range jp.Targets {
-		target, err := GetTarget(targetId)
+		target, err := Targets.Get(targetId)
 		if err != nil {
 			return nil, err
 		}
-		p.Targets[idx] = target
+		p.Targets[idx] = &target
 	}
 
 	return &p, nil

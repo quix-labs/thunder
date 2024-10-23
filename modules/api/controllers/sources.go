@@ -7,7 +7,6 @@ import (
 	"github.com/quix-labs/thunder/modules/http_server"
 	"log"
 	"net/http"
-	"strconv"
 )
 
 func SourceRoutes(mux *http.ServeMux) {
@@ -19,18 +18,18 @@ func SourceRoutes(mux *http.ServeMux) {
 }
 
 type SourceApiDetails struct {
-	ID      int    `json:"id"`
+	ID      string `json:"id"`
 	Driver  string `json:"driver"`
 	Config  any    `json:"config"`
 	Excerpt string `json:"excerpt"`
 }
 
 func listSources(w http.ResponseWriter, r *http.Request) {
-	sources := thunder.GetSources()
+	sources := thunder.Sources.All()
 	var res []SourceApiDetails
 
 	for _, source := range sources {
-		serializeSource, err := thunder.SerializeSource(source)
+		serializeSource, err := thunder.SerializeSource(&source)
 		if err != nil {
 			writeJsonError(w, http.StatusInternalServerError, err, "")
 			return
@@ -66,9 +65,7 @@ func createSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Reset id to 0
-	source.ID = 0
-	err = thunder.AddSource(source)
+	err = thunder.Sources.Register("", *source)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
@@ -86,14 +83,10 @@ func createSource(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateSource(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
+	id := r.PathValue("id")
 
 	var s thunder.JsonSource
-	err = http_server.DecodeJSONBody(w, r, &s)
+	err := http_server.DecodeJSONBody(w, r, &s)
 	if err != nil {
 		var mr *http_server.MalformedRequest
 		if errors.As(err, &mr) {
@@ -111,7 +104,7 @@ func updateSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := thunder.UpdateSource(id, newSource); err != nil {
+	if err := thunder.Sources.Update(id, *newSource); err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
@@ -128,13 +121,8 @@ func updateSource(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteSource(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
-
-	err = thunder.DeleteSource(id)
+	id := r.PathValue("id")
+	err := thunder.Sources.Delete(id)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
@@ -153,13 +141,9 @@ func deleteSource(w http.ResponseWriter, r *http.Request) {
 }
 
 func getSourceStats(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
+	id := r.PathValue("id")
 
-	source, err := thunder.GetSource(id)
+	source, err := thunder.Sources.Get(id)
 	if err != nil {
 		writeJsonError(w, http.StatusBadRequest, err, "")
 		return

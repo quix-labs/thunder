@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
+	"github.com/quix-labs/thunder/utils"
 	"log"
 	"net/http"
 )
@@ -30,13 +31,14 @@ func testTargetDriver(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	driver, err := thunder.GetTargetDriver(p.Driver)
+	driver, err := thunder.TargetDrivers.Get(p.Driver)
 	if err != nil {
 		writeJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
-	configInstance, err := thunder.ConvertToDynamicConfig(&driver.Config, p.Config)
+	driverConfig := driver.Config()
+	configInstance, err := utils.ConvertToDynamicConfig(driverConfig.Config, p.Config)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
@@ -61,17 +63,19 @@ func testTargetDriver(w http.ResponseWriter, r *http.Request) {
 }
 
 type TargetDriverDetails struct {
-	Config *thunder.TargetDriverInfo   `json:"config"`
-	Fields thunder.DynamicConfigFields `json:"fields"`
+	Config *thunder.TargetDriverConfig `json:"config"`
+	Fields utils.DynamicConfigFields   `json:"fields"`
 }
 
 func listTargetDrivers(w http.ResponseWriter, r *http.Request) {
-	registeredDrivers := thunder.GetTargetDrivers()
+	registeredDrivers := thunder.TargetDrivers.All()
 	res := make(map[string]*TargetDriverDetails, len(registeredDrivers))
-	for _, driver := range registeredDrivers {
-		res[driver.ID] = &TargetDriverDetails{
-			Config: &driver,
-			Fields: thunder.ParseDynamicConfigFields(&driver.Config),
+	for driverID, driver := range registeredDrivers {
+		driverConfig := driver.Config()
+
+		res[driverID] = &TargetDriverDetails{
+			Config: &driverConfig,
+			Fields: utils.ParseDynamicConfigFields(&driverConfig.Config),
 		}
 	}
 	writeJsonResponse(w, http.StatusOK, res)

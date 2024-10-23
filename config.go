@@ -57,7 +57,7 @@ func LoadConfig() error {
 		if err != nil {
 			return err
 		}
-		if err = AddSource(source); err != nil {
+		if err = Sources.Register(source.ID, *source); err != nil {
 			return err
 		}
 	}
@@ -68,8 +68,7 @@ func LoadConfig() error {
 		if err != nil {
 			return err
 		}
-
-		if err = AddTarget(target); err != nil {
+		if err = Targets.Register(target.ID, *target); err != nil {
 			return err
 		}
 	}
@@ -81,7 +80,7 @@ func LoadConfig() error {
 			return err
 		}
 
-		if err = AddProcessor(processor); err != nil {
+		if err = Processors.Register(processor.ID, processor); err != nil {
 			return err
 		}
 	}
@@ -94,8 +93,8 @@ func SaveConfig() error {
 
 	// Add sources
 	config.Sources = []*JsonSource{}
-	for _, source := range GetSources() {
-		jsonSource, err := SerializeSource(source)
+	for _, source := range Sources.All() {
+		jsonSource, err := SerializeSource(&source)
 		if err != nil {
 			return err
 		}
@@ -104,7 +103,7 @@ func SaveConfig() error {
 
 	// Add Processors
 	config.Processors = []*JsonProcessor{}
-	for _, processor := range GetProcessors() {
+	for _, processor := range Processors.All() {
 		jsonProcessor, err := SerializeProcessor(processor)
 		if err != nil {
 			return err
@@ -114,8 +113,8 @@ func SaveConfig() error {
 
 	// Add targets
 	config.Targets = []*JsonTarget{}
-	for _, target := range GetTargets() {
-		jsonTarget, err := SerializeTarget(target)
+	for _, target := range Targets.All() {
+		jsonTarget, err := SerializeTarget(&target)
 		if err != nil {
 			return err
 		}

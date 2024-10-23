@@ -15,28 +15,33 @@ import (
 	"time"
 )
 
+const DriverID = "thunder.postgresql_flash"
+
 func init() {
-	thunder.RegisterSourceDriver(&Driver{})
+	_ = thunder.SourceDrivers.Register(DriverID, &Driver{})
 }
 
 type Driver struct {
 	config *DriverConfig
 }
 
+func (d *Driver) New(config any) (thunder.SourceDriver, error) {
+	cfg, ok := config.(*DriverConfig)
+	if !ok {
+		return nil, errors.New("invalid config type")
+	}
+	return &Driver{config: cfg}, nil
+}
+
+func (d *Driver) ID() string {
+	return DriverID
+}
+
 //go:embed icon.svg
 var logo string
 
-func (d *Driver) DriverInfo() thunder.SourceDriverInfo {
-	return thunder.SourceDriverInfo{
-		ID: "postgresql_flash",
-		New: func(config any) (thunder.SourceDriver, error) {
-			cfg, ok := config.(*DriverConfig)
-			if !ok {
-				return nil, errors.New("invalid config type")
-			}
-			return &Driver{config: cfg}, nil
-		},
-
+func (d *Driver) Config() thunder.SourceDriverConfig {
+	return thunder.SourceDriverConfig{
 		Name:   "PostgreSQL (Flash)",
 		Image:  logo,
 		Config: DriverConfig{},
@@ -104,8 +109,8 @@ func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, in utils
 
 func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEvent]) error {
 
-	publicationSlotPrefix := "thunder_p" + strconv.Itoa(p.ID)
-	replicationSlot := "thunder_replication_p" + strconv.Itoa(p.ID)
+	publicationSlotPrefix := "thunder_p" + p.ID
+	replicationSlot := "thunder_replication_p" + p.ID
 
 	conn, err := d.newConn()
 	if err != nil {
@@ -137,7 +142,7 @@ func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEv
 
 	// START LISTENING
 	flashClient, _ := flash.NewClient(&flash.ClientConfig{
-		Logger:      thunder.GetLoggerForSourceDriver(&Driver{}),
+		Logger:      thunder.GetLoggerForSourceDriver(DriverID),
 		DatabaseCnx: "postgresql://devuser:devpass@localhost:5432/devdb?sslmode=disable",
 		//Driver: wal_logical.NewDriver(&wal_logical.DriverConfig{
 		//	PublicationSlotPrefix: publicationSlotPrefix,
@@ -255,9 +260,9 @@ func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEv
 		errChan <- flashClient.Start()
 	}()
 	defer func() {
-		thunder.GetLoggerForSourceDriver(d).Debug().Msg("send close signal to flash")
+		thunder.GetLoggerForSourceDriver(DriverID).Debug().Msg("send close signal to flash")
 		if err := flashClient.Close(); err != nil {
-			thunder.GetLoggerForSourceDriver(d).Error().Msg(err.Error())
+			thunder.GetLoggerForSourceDriver(DriverID).Error().Msg(err.Error())
 		}
 	}()
 

@@ -8,19 +8,21 @@ import (
 	"net/http"
 )
 
+const ModuleID = "thunder.api"
+
 func init() {
-	thunder.RegisterModule(&Module{})
+	thunder.Modules.Register(ModuleID, &Module{})
 	http_server.RegisterHandler(&Module{})
 }
 
 type Module struct{}
 
-func (m *Module) ThunderModule() thunder.ModuleInfo {
-	return thunder.ModuleInfo{
-		ID:              "thunder.api",
-		New:             func() thunder.Module { return new(Module) },
-		RequiredModules: []string{"thunder.http_server"},
-	}
+func (m *Module) RequiredModules() []string {
+	return []string{"thunder.http_server"}
+}
+
+func (m *Module) New() thunder.Module {
+	return new(Module)
 }
 
 func (m *Module) HandleRoutes(mux *http.ServeMux) {
@@ -30,6 +32,7 @@ func (m *Module) HandleRoutes(mux *http.ServeMux) {
 	controllers.TargetDriverRoutes(mux)
 	controllers.TargetRoutes(mux)
 	controllers.EventsRoutes(mux)
+	controllers.ExporterRoutes(mux)
 }
 
 func (m *Module) Start() error {

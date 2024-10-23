@@ -20,7 +20,7 @@ func events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	stopListening := thunder.GetBroadcaster().OnAll(func(event string, data any) {
+	stopListening := thunder.GetEventBroadcaster().OnAll(func(event string, data any) {
 		payload, err := json.Marshal(data)
 		if err != nil {
 			return // TODO ERROR

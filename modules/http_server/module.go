@@ -6,17 +6,20 @@ import (
 	"net/http"
 )
 
+const ModuleID = "thunder.http_server"
+
 func init() {
-	thunder.RegisterModule(&Module{})
+	thunder.Modules.Register(ModuleID, &Module{})
 }
 
 type Module struct{}
 
-func (m *Module) ThunderModule() thunder.ModuleInfo {
-	return thunder.ModuleInfo{
-		ID:  "thunder.http_server",
-		New: func() thunder.Module { return new(Module) },
-	}
+func (m *Module) RequiredModules() []string {
+	return []string{}
+}
+
+func (m *Module) New() thunder.Module {
+	return new(Module)
 }
 
 func (m *Module) Start() error {
@@ -38,12 +41,12 @@ func (m *Module) Start() error {
 		errChan <- nil
 	}()
 
-	thunder.GetLoggerForModule(&Module{}).Info().Msgf("start listening on %s", srv.Addr)
+	thunder.GetLoggerForModule(ModuleID).Info().Msgf("start listening on %s", srv.Addr)
 
 	return <-errChan
 }
 func (m *Module) Stop() error {
-	thunder.GetLoggerForModule(&Module{}).Info().Msg("stop listening")
+	thunder.GetLoggerForModule(ModuleID).Info().Msg("stop listening")
 	return nil
 }
 

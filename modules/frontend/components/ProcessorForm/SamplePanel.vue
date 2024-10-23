@@ -1,17 +1,16 @@
 <template>
-  <div class="flex flex-col flex-1 gap-y-4 max-h-screen overflow-auto p-4">
+  <div class="flex flex-col flex-1 max-h-full gap-y-4 overflow-auto p-4">
     <UCard class="flex flex-col flex-1 overflow-x-hidden overflow-y-auto" :ui="{
-      divide:'',
-      body: { base: 'flex-1' },
-      header:{base:'sticky z-20 top-0 shadow-md bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800'},
-      footer:{base:'sticky z-20 bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800'}
+      body: 'flex-1 overflow-y-auto',
+      // header:'sticky z-20 top-0 shadow-md bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800',
+      // footer:'sticky z-20 bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800'
     }">
       <template #header>
         <div class="flex items-center justify-between">
           <p class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
             Document Sample
           </p>
-          <UButton color="sky" :loading="status==='pending'" @click.prevent="refresh">
+          <UButton color="primary" :loading="status==='pending'" @click.prevent="()=>refresh()">
             Fetch Sample
           </UButton>
         </div>
@@ -44,20 +43,19 @@
           responding as expected.</p>
         <p>You may need to check the response format or any related configuration.</p>
         <p class="font-semibold text-lg w-full">{{ error?.message }}</p>
-        <UButton color="red" @click="refresh">Retry</UButton>
+        <UButton color="error" @click="()=>refresh()">Retry</UButton>
       </div>
-
       <template #footer>
         <div class="flex items-center justify-between">
           <label class="flex items-center gap-x-4 cursor-pointer">
-            <UToggle
-                on-icon="i-heroicons-check-20-solid"
-                off-icon="i-heroicons-x-mark-20-solid"
+            <USwitch
+                checked-icon="i-heroicons-check-20-solid"
+                unchecked-icon="i-heroicons-x-mark-20-solid"
                 v-model="state.liveReload"
             />
             Live reload
           </label>
-          <UButton color="gray" :disabled="!data" @click.prevent.stop="download">
+          <UButton color="secondary" :disabled="!data" @click.prevent.stop="download">
             Download
           </UButton>
         </div>

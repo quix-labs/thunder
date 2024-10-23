@@ -1,150 +1,110 @@
 <template>
   <section class="grid gap-y-4">
-    <UFormGroup label="Source" required name="source">
-      <div class="grid grid-cols-2 gap-4">
-        <div v-for="source in sources||[]" :key="`source-${source.id}`">
-          <input
-              type="radio"
-              name="source"
-              v-model="form.source"
-              :value="source.id"
-              class="sr-only peer"
-              :id="`source-${source.id}`"
-              tabindex="-1"
-          />
-          <label
-              tabindex="0"
-              @keydown.enter.space.prevent="form.driver=source.id"
-              :for="`source-${source.id}`"
-              class="cursor-pointer flex flex-col gap-y-2 items-center rounded-lg p-4 text-gray-900 dark:text-white bg-white dark:bg-gray-900 ring-1 ring-gray-200 dark:ring-gray-800 peer-checked:ring-2 peer-checked:ring-primary-500"
-          >
-            <p class="font-semibold">Source n°{{ source.id }}</p>
-            <span class="italic text-gray-400" v-if="source.excerpt">{{ source.excerpt }}</span>
-          </label>
-        </div>
-
-        <div
-            class="cursor-pointer flex flex-col gap-y-2 items-center rounded-lg p-4 text-gray-900 dark:text-white bg-white dark:bg-gray-900 ring-1 ring-gray-200 dark:ring-gray-800 peer-checked:ring-2 peer-checked:ring-primary-500"
-            @click.prevent="createSourceOpened=true"
-        >
-          + CREATE SOURCE
-        </div>
-
-      </div>
-    </UFormGroup>
-
-    <UFormGroup label="Table" required name="table" v-if="availableTables">
-      <USelectMenu
-          creatable
-          searchable
-          v-model="form.table"
-          :options="Object.keys(availableTables)"
-          placeholder="Select a table"
-      >
-        <template #option-create="{ option }">
-          Force manual: {{ option }}
+    <UFormField label="Source" required name="source">
+      <FormCardsInput :options="sources?.map(source=>({value:source.id,item:source}))||[]" v-model="form.source">
+        <template #default="{item}">
+          <div class="text-center">
+            <p class="font-semibold">Source n°{{ item.id }}</p>
+            <span class="italic text-gray-400" v-if="item.excerpt">{{ item.excerpt }}</span>
+          </div>
         </template>
-        <template #empty>No tables available for the selected source.</template>
-      </USelectMenu>
-    </UFormGroup>
 
-    <UFormGroup label="Primary keys" required name="primaryKeys" v-if="availableTables">
-      <USelectMenu
-          searchable
+        <template #create>
+          <div
+              class="col-span-full flex justify-center items-center gap-x-1 cursor-pointer  rounded-lg p-4 text-lg text-gray-900 dark:text-white bg-white dark:bg-gray-900 ring-1 ring-gray-200 dark:ring-gray-800"
+              @click="()=>openCreateForm()">
+            <UIcon name="heroicons-plus"/>
+            <span>Create</span>
+          </div>
+
+        </template>
+      </FormCardsInput>
+    </UFormField>
+
+    <UFormField label="Table" required name="table">
+      <UInputMenu
+          v-model="form.table"
+          :items="Object.keys(availableTables||{})"
+          placeholder="Select a table"
+          :loading="statsStatus==='idle'||statsStatus==='pending'"
+      >
+        <template #empty>No tables available for the selected source.</template>
+      </UInputMenu>
+    </UFormField>
+
+    <UFormField label="Primary keys" required name="primaryKeys" v-if="availableTables">
+      <UInputMenu
           multiple
           v-model="form.primary_keys"
-          :options="[...new Set([...availableTables?.[form.table]?.columns || [],...form.primary_keys||[]])]"
+          :loading="statsStatus==='idle'||statsStatus==='pending'"
+          :items="[...new Set([...availableTables?.[form.table]?.columns || [],...form.primary_keys||[]])]"
       >
-        <template #label>
-          <span v-if="form.primary_keys?.length>0" class="truncate">{{ form.primary_keys.join(', ') }}</span>
-          <span v-else>Select primary keys</span>
-        </template>
         <template #empty>No columns available for the selected table.</template>
-      </USelectMenu>
-    </UFormGroup>
+      </UInputMenu>
+    </UFormField>
 
-    <UDivider label="Conditions"/>
+    <USeparator label="Conditions"/>
 
     <UCard v-for="(condition,index) in form.conditions"
-           :ui="{body:{base:'grid grid-cols-3 gap-x-4'},header:{base:'flex justify-between items-center'}}">
+           :key="'conditions:'+index"
+           :ui="{body:'grid grid-cols-3 gap-x-4',header:'flex justify-between items-center p-2 sm:p-2 font-bold'}">
       <template #header>
         Condition {{ index }}
-        <UButton color="red" size="xs" icon="i-heroicons-trash" @click.prevent="removeCondition(index)"/>
+        <UButton color="error" class="cursor-pointer" variant="ghost" size="sm" icon="i-heroicons-trash" @click.prevent="removeCondition(index)"/>
       </template>
-      <UFormGroup label="Column" required :name="`conditions.${index}.column`" v-if="availableTables">
-        <USelectMenu searchable creatable v-model="form.conditions[index].column"
-                     :options="availableTables?.[form.table]?.columns || []" placeholder="Select a column"/>
-      </UFormGroup>
 
-      <UFormGroup label="Operator" required :name="`conditions.${index}.operator`"
+      <UFormField label="Column" required :name="`conditions.${index}.column`" v-if="availableTables">
+        <UInputMenu
+            :loading="statsStatus==='idle'||statsStatus==='pending'"
+            class="w-full"
+            searchable
+            v-model="form.conditions[index].column"
+            :items="availableTables?.[form.table]?.columns || []" placeholder="Select a column"/>
+      </UFormField>
+
+      <UFormField label="Operator" required :name="`conditions.${index}.operator`"
                   v-if="form.conditions[index].column||null">
         <USelectMenu
             v-model="form.conditions[index].operator"
-            :options="[
-                {label:'IS',value:'='},
-                {label:'IS NULL',value:'is null'},
-                {label:'IS NOT NULL',value:'is not null'},
-                {label:'IS TRUE',value:'is true'},
-                {label:'IS FALSE',value:'is false'},
-            ]"
-            @change="form.conditions[index].value=undefined"
-            value-attribute="value"
-            option-attribute="label"
+            class="w-full"
+            :items="[
+                    {label:'IS',value:'='},
+                    {label:'IS NULL',value:'is null'},
+                    {label:'IS NOT NULL',value:'is not null'},
+                    {label:'IS TRUE',value:'is true'},
+                    {label:'IS FALSE',value:'is false'},
+                ]"
+            value-key="value"
             placeholder="Select an operator"/>
-      </UFormGroup>
-
-      <UFormGroup label="Value" required :name="`conditions.${index}.value`"
+      </UFormField>
+      <UFormField label="Value" required :name="`conditions.${index}.value`"
                   v-if="form.conditions[index].operator==='='">
-        <UInput type="text" v-model="form.conditions[index].value" placeholder="Select an operator"/>
-      </UFormGroup>
+        <UInput type="text" v-model="form.conditions[index].value" class="w-full" placeholder="Select an operator"/>
+      </UFormField>
     </UCard>
 
     <UButton class="text-center" block @click.prevent="form.conditions.push({})">+ Add condition</UButton>
 
-
-    <SourceForm v-model:opened="createSourceOpened" @created="refresh" mode="create"/>
+    <FormSource v-model:open="formOpened" mode="create" @created="()=>refresh()"/>
   </section>
 </template>
 <script setup lang="ts">
-import {type Stats} from "~/composables/useSourceStats";
+import {FormSource} from "#components";
 
 const form = defineModel<any>('form', {required: true})
 const {data: sources, refresh} = useSources()
 
-const availableTables = ref<Stats>({});
+const {data: availableTables, status: statsStatus} = useSourceStats(toRef(form.value, 'source'))
 
-
-const computeAvailableTables = async () => {
-  if (form.value.source === null) return;
-
-  const {data, status, error} = await useSourceStats(form.value.source);
-
-  availableTables.value = data.value || {};
-
-  if (status.value === 'error') {
-    const errorMessage = error.value?.statusCode === 422
-        ? error.value.data?.error
-        : error.value?.message;
-
-    useToast().add({title: 'Error fetching stats', description: errorMessage, color: 'red'});
-    return;
-  }
-
-  if (!data.value) {
-    useToast().add({title: 'No Data', description: 'Empty stats received', color: 'orange'});
-    return;
-  }
+const formOpened = ref(false)
+const openCreateForm = () => {
+  formOpened.value = true
 }
-const createSourceOpened = ref(false);
-
-watch(() => form.value.source, computeAvailableTables);
-onMounted(computeAvailableTables)
 onBeforeMount(() => {
   form.value.conditions ||= []
 })
 
 function removeCondition(index: number) {
   form.value.conditions = form.value.conditions?.filter((_, key) => key !== index)
-
 }
 </script>

@@ -1,82 +1,49 @@
 <template>
-  <section>
-    <UCard class="w-full" :ui="{
-      divide: 'divide-y divide-gray-200 dark:divide-gray-700',
-      body: { padding: '' },
-      header:{base:'flex gap-x-2 justify-between items-center'},
-      footer:{base:'text-sm leading-5 text-center'}
-    }">
-      <template #header>
-        <h1 class="font-semibold text-xl text-gray-900 dark:text-white leading-tight">Processors</h1>
-        <UButton @click.prevent="createProcessor" variant="soft">+ Add Processor</UButton>
-      </template>
-      <template #default>
-        <UTable @select="(row:any)=>showProcessor(row.id)" :columns="columns" :rows="rows"
-                :sort="{column:'id',direction:'desc'}"
-                :loading="status==='pending' || status==='idle'">
-          <template #actions-data="{ row }">
-            <div class="flex gap-1">
-              <UDropdown :items="[[
-                  {label:'Replicate',click:()=>cloneProcessor(row.id)},
-                  {label:'Claim indexing',click:()=>claimIndex(row.id),disabled:row.indexing},
-                  {label:'Start listening',click:()=>claimStart(row.id),disabled:row.listening},
-                  {label:'Stop listening',click:()=>claimStop(row.id),disabled:!row.listening},
-              ]]" @click.stop>
-                <UButton icon="i-heroicons-ellipsis-horizontal" variant="link" color="gray" size="xl" :padded="false"/>
-              </UDropdown>
+  <UCard as="section" id="processors"
+         :ui="{header:'flex gap-x-2 justify-between items-center',footer:'text-sm leading-5 text-center'}">
+    <template #header>
+      <h1>Processors</h1>
+      <div class="flex space-x-4">
+        <KbdButton :kbds="['r']" label="Refresh" color="info" variant="soft" icon="i-heroicons-arrow-path-20-solid"
+                   @click="()=>refresh()" :loading="status==='pending' || status==='idle'"/>
+        <KbdButton :kbds="['c']" label="Create" variant="soft" leading-icon="i-heroicons-plus" :disabled="slideoverOpen"
+                   @click="()=>openCreateForm()"/>
+      </div>
+    </template>
+    {{ focusedId }}
+    <div v-for="processor in processors" class="flex justify-between w-full" @focusin.passive="focusedId=processor.id"
+         tabindex="0">
+      {{ processor.id }} - {{ processor.index }}
+      <div class="flex gap-x-4">
+        <KbdButton :kbds="focusedId===processor.id ? ['s'] : undefined" label="Show" color="neutral" variant="soft"
+                   icon="i-heroicons-eye"
+                   @click="()=>openShowForm(processor.id)"/>
+        <KbdButton :kbds="focusedId===processor.id ? ['e'] : undefined"  label="Edit" color="info" variant="soft" icon="i-heroicons-pencil-square"
+                   @click="()=>openEditForm(processor.id)"/>
+        <KbdButton :kbds="focusedId===processor.id ? ['d'] : undefined"  label="Download" variant="soft" color="primary"
+                   leading-icon="i-heroicons-document-arrow-down"
+                   @click="()=>openDownloadForm(processor.id)"/>
+        <KbdButton :kbds="focusedId===processor.id ? ['meta','d'] : undefined" label="Delete" variant="soft" color="error" leading-icon="i-heroicons-trash"
+                   @click="()=>deleteProcessor(processor.id)"/>
+      </div>
+    </div>
 
-              <UButton icon="i-heroicons-eye" variant="link" color="gray" size="xl" :padded="false"
-                       @click.stop.prevent="showProcessor(row.id)"/>
-              <UButton icon="i-heroicons-pencil-square" variant="link" color="gray" size="xl" :padded="false"
-                       @click.stop.prevent="editProcessor(row.id)"/>
-
-              <UButton icon="i-heroicons-document-arrow-down" variant="link" color="primary" size="xl" :padded="false"
-                       @click.stop.prevent="openDownloadModal(row.id)"/>
-              <UButton icon="i-heroicons-trash" variant="link" color="red" size="xl" :padded="false"
-                       @click.stop.prevent="deleteProcessor(row.id)"/>
-            </div>
-          </template>
-          <template #targets-data="{ row }">
-            <div class="flex gap-1">
-              <UBadge size="xs" :label="`Target n°${target}`" color="sky" variant="subtle"
-                      v-for="target in row.targets"/>
-            </div>
-          </template>
-          <template #source-data="{ row }">
-            <div class="flex gap-1">
-              <UBadge size="xs" :label="`Source n°${row.source}`" color="sky" variant="subtle"/>
-            </div>
-          </template>
-          <template #stats-data="{ row }">
-            <div class="flex gap-1">
-              <UBadge size="xs" :label="`${row.stats.total} fields`" color="gray"/>
-              <UBadge size="xs" :label="`${row.stats.relations} relations`" color="gray"/>
-              <UBadge size="xs" :label="`${row.stats.conditions} conditions`" color="gray"/>
-            </div>
-          </template>
-          <template #indexing-data="{ row }">
-            <UBadge size="xs" :label="row.indexing?'Indexing':'Not indexing'" :color="row.indexing?'green':'red'"/>
-          </template>
-          <template #listening-data="{ row }">
-            <UBadge size="xs" :label="row.listening?'Listening':'Not listening'" :color="row.listening?'green':'red'"/>
-          </template>
-        </UTable>
-      </template>
-      <template #footer>
-        <span class="font-medium">Total:&nbsp;</span>
-        <span>{{ rows?.length || 0 }}&nbsp;processors</span>
-      </template>
-    </UCard>
-    <ProcessorFormComplete :mode="formMode" v-model:opened="formOpened" :processor="formProcessor"/>
-  </section>
+    <template #footer>
+      <span class="font-medium">Total:&nbsp;</span>
+      <span>{{ rows?.length || 0 }}&nbsp;processors</span>
+    </template>
+  </UCard>
 
 </template>
 
 <script setup lang="ts">
+import KbdButton from "../components/KbdButton.vue";
+import {LazyDownloadProcessorForm, ProcessorFormComplete} from "#components";
 
-import {LazyModalDownloadProcessor} from "#components";
+const {status, data: processors, refresh} = useProcessors()
+const slideoverOpen = useSlideover()?.isOpen
 
-const {status, data: processors} = useProcessors()
+const focusedId = ref<number>()
 
 // Table
 const columns = [
@@ -117,59 +84,66 @@ const getMappingStats = (mapping: any[]) => {
   })
   return stats
 }
+
 // Form
 
-const formOpened = ref(false);
-const formMode = ref<"create" | "edit" | "read">("create");
-const formProcessor = ref<any>();
+const openCreateForm = () => {
+  useSlideover().open(ProcessorFormComplete, {mode: "create", onCreated: () => refresh(), onUpdated: () => refresh()})
+}
+const openShowForm = (id: number) => {
+  const processor = processors.value?.find(s => s.id === id)
+  useSlideover().open(ProcessorFormComplete, {
+    mode: "read",
+    processor,
+    onCreated: () => refresh(),
+    onUpdated: () => refresh()
+  })
+}
+const openEditForm = (id: number) => {
+  const processor = processors.value?.find(s => s.id === id)
+  useSlideover().open(ProcessorFormComplete, {
+    mode: "edit",
+    processor,
+    onCreated: () => refresh(),
+    onUpdated: () => refresh()
+  })
+}
 
-const createProcessor = async () => {
-  formMode.value = "create"
-  formProcessor.value = undefined
-  formOpened.value = true
+const openCloneForm = (id: number) => {
+  const processor = processors.value?.find(s => s.id === id)
+  useSlideover().open(ProcessorFormComplete, {
+    mode: "create",
+    processor: {...toRaw(processor)},
+    onCreated: () => refresh(),
+    onUpdated: () => refresh()
+  })
 }
-const showProcessor = async (id: number) => {
-  formMode.value = "read"
-  formProcessor.value = processors.value?.filter(p => p.id === id)?.at(0)
-  formOpened.value = true
-}
-const editProcessor = async (id: number) => {
-  formMode.value = "edit"
-  formProcessor.value = processors.value?.filter(p => p.id === id)?.at(0)
-  formOpened.value = true
-}
-const cloneProcessor = async (id: number) => {
-  formMode.value = "create"
-  formProcessor.value = {...processors.value?.filter(p => p.id === id)?.at(0)}
-  formOpened.value = true
+
+const openDownloadForm = (id: number) => {
+  useModal().open(LazyDownloadProcessorForm,{processorId:id})
 }
 
 const deleteProcessor = async (id: number) => {
   const {data, error, status} = await useGoFetch(`/processors/${id}`, {method: "DELETE"})
   if (status.value === "error") {
-    useToast().add({color: "red", title: "Unable to delete processor", description: error.value?.message})
+    useToast().add({color: "error", title: "Unable to delete processor", description: error.value?.message})
   } else if (status.value === "success") {
     const serverData = data.value as { message?: string }
-    useToast().add({color: "green", title: "Successfully deleted processor", description: serverData.message})
+    useToast().add({color: "success", title: "Successfully deleted processor", description: serverData.message})
   }
-}
-
-const openDownloadModal = (id: number) => {
-  const modal = useModal()
-  modal.open(LazyModalDownloadProcessor, {processorId: id})
 }
 
 const claimIndex = (id: number) => {
   useGoFetch(`/processors/${id}/index`, {method: "POST"}).then(({data, error, status}) => {
     if (status.value === "error") {
       useToast().add({
-        color: "red",
+        color: "error",
         title: "Unable to indexing",
         description: error.value?.data?.error || error.value?.message
       })
     } else if (status.value === "success") {
       const serverData = data.value as { message?: string }
-      useToast().add({color: "green", title: "Successfully indexed", description: serverData.message})
+      useToast().add({color: "success", title: "Successfully indexed", description: serverData.message})
     }
   })
 }
@@ -177,13 +151,13 @@ const claimStart = (id: number) => {
   useGoFetch(`/processors/${id}/start`, {method: "POST"}).then(({data, error, status}) => {
     if (status.value === "error") {
       useToast().add({
-        color: "red",
+        color: "error",
         title: "Unable to start",
         description: error.value?.data?.error || error.value?.message
       })
     } else if (status.value === "success") {
       const serverData = data.value as { message?: string }
-      useToast().add({color: "green", title: "Successfully started", description: serverData.message})
+      useToast().add({color: "success", title: "Successfully started", description: serverData.message})
     }
   })
 }
@@ -191,13 +165,13 @@ const claimStop = (id: number) => {
   useGoFetch(`/processors/${id}/stop`, {method: "POST"}).then(({data, error, status}) => {
     if (status.value === "error") {
       useToast().add({
-        color: "red",
+        color: "error",
         title: "Unable to stop",
         description: error.value?.data?.error || error.value?.message
       })
     } else if (status.value === "success") {
       const serverData = data.value as { message?: string }
-      useToast().add({color: "green", title: "Successfully stopped", description: serverData.message})
+      useToast().add({color: "success", title: "Successfully stopped", description: serverData.message})
     }
   })
 }

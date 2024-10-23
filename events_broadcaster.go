@@ -57,6 +57,6 @@ var (
 	}
 )
 
-func GetBroadcaster() *EventsBroadcaster {
+func GetEventBroadcaster() *EventsBroadcaster {
 	return broadcaster
 }

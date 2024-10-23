@@ -14,8 +14,10 @@ import (
 	"time"
 )
 
+const DriverID = "thunder.elastic"
+
 func init() {
-	thunder.RegisterTargetDriver(&Driver{})
+	_ = thunder.TargetDrivers.Register(DriverID, &Driver{})
 }
 
 type Driver struct {
@@ -23,28 +25,33 @@ type Driver struct {
 	client *elasticsearch.TypedClient
 }
 
+func (d *Driver) New(config any) (thunder.TargetDriver, error) {
+	cfg, ok := config.(*DriverConfig)
+	if !ok {
+		return nil, errors.New("invalid config type")
+	}
+
+	client, err := NewConn(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Driver{config: cfg, client: client}, nil
+}
+
+func (d *Driver) ID() string {
+	return DriverID
+}
+
 //go:embed icon.svg
 var logo string
 
-func (d *Driver) DriverInfo() thunder.TargetDriverInfo {
-	return thunder.TargetDriverInfo{
-		ID: "elastic",
-		New: func(config any) (thunder.TargetDriver, error) {
-			cfg, ok := config.(*DriverConfig)
-			if !ok {
-				return nil, errors.New("invalid config type")
-			}
-
-			client, err := NewConn(cfg)
-			if err != nil {
-				return nil, err
-			}
-
-			return &Driver{config: cfg, client: client}, nil
-		},
+func (d *Driver) Config() thunder.TargetDriverConfig {
+	return thunder.TargetDriverConfig{
 		Name:   "Elasticsearch",
 		Config: DriverConfig{},
 		Image:  logo,
+		Notes:  nil,
 	}
 }
 

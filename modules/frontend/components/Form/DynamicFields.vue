@@ -1,51 +1,49 @@
 <template>
-  <UFormGroup
-      v-for="field in fields"
-      :required="field.required"
-      :label="field.label"
-      :name="`${rootName}${field.name}`"
-      :help="field.help">
+  <UForm :state :schema ref="formEl" class="space-y-4">
+    <UFormField
+        v-for="field in fields"
+        :required="field.required"
+        :label="field.label"
+        :name="`${field.name}`"
+        :help="field.help">
 
-    <UInput
-        autocomplete="off"
-        type="number"
-        v-if="['number'].includes(field.type)"
-        :min="field.min"
-        :max="field.max"
-        :value="model[field.name]"
-        @input="(e:any) => (model[field.name]=e.target.value===''?undefined:parseFloat(e.target.value))"
-    />
-    <UInput
-        autocomplete="off"
-        :type="field.type"
-        v-else-if="['url','text','password'].includes(field.type)"
-        v-model="model[field.name]"/>
-    <span v-else>{{ field.type }} not supported!</span>
-  </UFormGroup>
+      <UInput
+          autocomplete="off"
+          type="number"
+          v-if="['number'].includes(field.type)"
+          :min="field.min"
+          :max="field.max"
+          :value="state[field.name]"
+          @input="(e:any) => (state[field.name]=e.target.value===''?undefined:parseFloat(e.target.value))"
+      />
+      <UInput
+          autocomplete="off"
+          :type="field.type"
+          v-else-if="['url','text','password'].includes(field.type)"
+          v-model="state[field.name]"/>
+      <span v-else>{{ field.type }} not supported!</span>
+    </UFormField>
+  </UForm>
 </template>
 <script setup lang="ts">
-import {z, ZodObject, type ZodRawShape} from "zod";
+import {z, type ZodRawShape} from "zod";
+
+const formEl = useTemplateRef("formEl")
 
 interface Props {
   fields?: any[]
-  rootName?: string,
 }
 
-const {fields = [], rootName = "config."} = defineProps<Props>()
+const {fields = []} = defineProps<Props>()
 
-const model = defineModel<{ [key: string]: any }>({default: {}})
-const schema = defineModel<ZodObject<ZodRawShape> | undefined>('schema', {required: false, default: {}})
+const state = defineModel<{ [key: string]: any }>('state', {required: true})
 
-function refreshSchema() {
+const schema = computed(() => {
   if (fields.length === 0) {
-    schema.value = undefined;
-    return;
+    return undefined;
   }
-
-  const driverFields = fields || [];
   const tmpSchema: ZodRawShape = {};
-
-  for (const field of driverFields) {
+  for (const field of fields) {
     let zodType = {
       email: z.string({required_error: `${field.label} is required`}).email("Invalid email"),
       number: z.number({required_error: `${field.label} is required`}),
@@ -60,22 +58,19 @@ function refreshSchema() {
     }
     tmpSchema[field.name] = field.required ? zodType.min(1, {message: `${field.label} is required`}) : z.optional(zodType).nullable();
   }
-
-  schema.value = z.object(tmpSchema);
-}
-
+  return z.object(tmpSchema)
+})
 
 function setDefaults() {
-  model.value ||= {}
+  state.value ||= {}
   fields.forEach(field => {
-    if (field.default && !model.value?.[field.name]) {
-      model.value[field.name] = field.type !== "number" ? field.default : parseFloat(field.default)
+    if (field.default && !state.value?.[field.name]) {
+      state.value[field.name] = field.type !== "number" ? field.default : parseFloat(field.default)
     }
   })
 }
 
 onBeforeMount(() => {
-  refreshSchema()
   setDefaults()
 })
 </script>

@@ -1,20 +1,15 @@
 package thunder
 
 import (
-	"encoding/json"
-	"github.com/creasty/defaults"
+	"errors"
 	"github.com/quix-labs/thunder/utils"
 	"github.com/rs/zerolog"
 	"os"
-	"reflect"
 )
 
-type SourceDriverInfo struct {
-	ID  string                                 `json:"ID"`
-	New func(config any) (SourceDriver, error) `json:"-"`
-
-	Name   string        `json:"name"`
-	Config DynamicConfig `json:"-"`
+type SourceDriverConfig struct {
+	Name   string              `json:"name"`
+	Config utils.DynamicConfig `json:"-"`
 
 	// As inlined SVG
 	Image string   `json:"image,omitempty"`
@@ -29,7 +24,11 @@ type SourceDriverStatsTable struct {
 type SourceDriverStats map[string]SourceDriverStatsTable
 
 type SourceDriver interface {
-	DriverInfo() SourceDriverInfo
+	ID() string
+
+	New(config any) (SourceDriver, error)
+
+	Config() SourceDriverConfig
 
 	TestConfig() (string, error) // TODO USELESS REPLACE IN FAVOR OF STATS TO CHECK NOT EMPTY
 	Stats() (*SourceDriverStats, error)
@@ -69,26 +68,15 @@ type DbEvent any // DbDeleteEvent | DbInsertEvent | DbPatchEvent | DbTruncateEve
 
 // UTILITIES FUNCTIONS
 
-func ConvertSourceDriverConfig(driver *SourceDriverInfo, config any) (any, error) {
-	typedConfig := reflect.New(reflect.TypeOf((*driver).Config)).Interface()
-	bytes, err := json.Marshal(config)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = json.Unmarshal(bytes, typedConfig); err != nil {
-		return nil, err
-	}
-
-	// Apply default tag if needed
-	if err := defaults.Set(typedConfig); err != nil {
-		return nil, err
-	}
-
-	return typedConfig, nil
-}
-
-func GetLoggerForSourceDriver(s SourceDriver) *zerolog.Logger {
-	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Str("source-driver", s.DriverInfo().ID).Stack().Timestamp().Logger()
+func GetLoggerForSourceDriver(driverID string) *zerolog.Logger {
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Str("source-driver", driverID).Stack().Timestamp().Logger()
 	return &logger
 }
+
+// SourceDrivers is a registry that allows external library to register their own source driver
+var SourceDrivers = utils.NewRegistry[SourceDriver]("source-driver").ValidateUsing(func(ID string, driver SourceDriver) error {
+	if driver.New == nil {
+		return errors.New(`target driver doesn't implements "New" method`)
+	}
+	return nil
+})

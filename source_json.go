@@ -1,7 +1,9 @@
 package thunder
 
+import "github.com/quix-labs/thunder/utils"
+
 type JsonSource struct {
-	ID     int    `json:"id"`
+	ID     string `json:"id"`
 	Driver string `json:"driver"`
 	Config any    `json:"config"`
 }
@@ -9,18 +11,19 @@ type JsonSource struct {
 func SerializeSource(s *Source) (*JsonSource, error) {
 	return &JsonSource{
 		ID:     s.ID,
-		Driver: s.Driver.DriverInfo().ID,
+		Driver: s.Driver.ID(),
 		Config: s.Config.(any),
 	}, nil
 }
 
 func UnserializeSource(js *JsonSource) (*Source, error) {
-	driver, err := GetSourceDriver(js.Driver)
+	driver, err := SourceDrivers.Get(js.Driver)
 	if err != nil {
 		return nil, err
 	}
 
-	typedConfig, err := ConvertToDynamicConfig(&driver.Config, js.Config)
+	config := driver.Config().Config
+	typedConfig, err := utils.ConvertToDynamicConfig(config, js.Config)
 	if err != nil {
 		return nil, err
 	}

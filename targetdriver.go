@@ -1,16 +1,15 @@
 package thunder
 
 import (
+	"errors"
+	"github.com/quix-labs/thunder/utils"
 	"github.com/rs/zerolog"
 	"os"
 )
 
-type TargetDriverInfo struct {
-	ID  string                                 `json:"ID"`
-	New func(config any) (TargetDriver, error) `json:"-"`
-
-	Name   string        `json:"name"`
-	Config DynamicConfig `json:"-"`
+type TargetDriverConfig struct {
+	Name   string              `json:"name"`
+	Config utils.DynamicConfig `json:"-"`
 
 	// As inlined SVG
 	Image string   `json:"image,omitempty"`
@@ -18,7 +17,11 @@ type TargetDriverInfo struct {
 }
 
 type TargetDriver interface {
-	DriverInfo() TargetDriverInfo
+	ID() string
+
+	New(config any) (TargetDriver, error)
+
+	Config() TargetDriverConfig
 
 	TestConfig() (string, error) // TODO USELESS REPLACE IN FAVOR OF STATS TO CHECK NOT EMPTY
 
@@ -51,7 +54,17 @@ type TargetTruncateEvent struct {
 
 type TargetEvent any // TargetDeleteEvent | TargetInsertEvent | TargetPatchEvent | TargetTruncateEvent
 
-func GetLoggerForTargetDriver(t TargetDriver) *zerolog.Logger {
-	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Str("target-driver", t.DriverInfo().ID).Stack().Timestamp().Logger()
+// UTILITIES FUNCTIONS
+
+func GetLoggerForTargetDriver(driver TargetDriver) *zerolog.Logger {
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Str("target-driver", driver.ID()).Stack().Timestamp().Logger()
 	return &logger
 }
+
+// TargetDrivers is a registry that allows external library to register their own target driver
+var TargetDrivers = utils.NewRegistry[TargetDriver]("target-driver").ValidateUsing(func(ID string, driver TargetDriver) error {
+	if driver.New == nil {
+		return errors.New(`target driver doesn't implements "New" method`)
+	}
+	return nil
+})

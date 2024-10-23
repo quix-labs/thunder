@@ -1,14 +1,18 @@
-import {joinURL} from "ufo";
 import {type FetchOptions} from "ofetch";
+import type {AsyncDataOptions} from "#app";
 
+const useGoLazyAsyncData = <T>(uniqueKey: string, request: string | (() => string), opts?: FetchOptions, asyncDataOpts?: AsyncDataOptions<T>) => {
 
-const useGoLazyAsyncData = <T>(uniqueKey: string, request: string, opts?: FetchOptions) => {
-    const fullPath = joinURL('/go-api', request)
-
-    return useAsyncData<T>(uniqueKey, () => $fetch(fullPath, opts), {
-        server: false,
-        lazy: true,
-        getCachedData: key => useNuxtApp().payload.data[key],
-    })
+    return useAsyncData<T>(uniqueKey, () => {
+            const resolvedRequest = typeof request === 'function' ? request() : request;
+            return $fetch(resolvedRequest, {...opts, baseURL: '/go-api'})
+        },
+        {
+            server: false,
+            lazy: true,
+            getCachedData: key => useNuxtApp().payload.data[key],
+            ...asyncDataOpts
+        }
+    );
 }
 export default useGoLazyAsyncData

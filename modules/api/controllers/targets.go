@@ -7,7 +7,6 @@ import (
 	"github.com/quix-labs/thunder/modules/http_server"
 	"log"
 	"net/http"
-	"strconv"
 )
 
 func TargetRoutes(mux *http.ServeMux) {
@@ -18,18 +17,17 @@ func TargetRoutes(mux *http.ServeMux) {
 }
 
 type TargetApiDetails struct {
-	ID      int    `json:"id"`
+	ID      string `json:"id"`
 	Driver  string `json:"driver"`
 	Config  any    `json:"config"`
 	Excerpt string `json:"excerpt"`
 }
 
 func listTargets(w http.ResponseWriter, r *http.Request) {
-	targets := thunder.GetTargets()
 	var res []TargetApiDetails
 
-	for _, target := range targets {
-		serializeTarget, err := thunder.SerializeTarget(target)
+	for _, target := range thunder.Targets.All() {
+		serializeTarget, err := thunder.SerializeTarget(&target)
 		if err != nil {
 			writeJsonError(w, http.StatusInternalServerError, err, "")
 			return
@@ -65,9 +63,7 @@ func createTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Reset id to 0
-	target.ID = 0
-	err = thunder.AddTarget(target)
+	err = thunder.Targets.Register("", *target)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
@@ -85,14 +81,10 @@ func createTarget(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateTarget(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
+	id := r.PathValue("id")
 
 	var s thunder.JsonTarget
-	err = http_server.DecodeJSONBody(w, r, &s)
+	err := http_server.DecodeJSONBody(w, r, &s)
 	if err != nil {
 		var mr *http_server.MalformedRequest
 		if errors.As(err, &mr) {
@@ -110,7 +102,7 @@ func updateTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := thunder.UpdateTarget(id, newTarget); err != nil {
+	if err := thunder.Targets.Update(id, *newTarget); err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
@@ -127,13 +119,9 @@ func updateTarget(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteTarget(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, errors.New("ID is not an integer"), "")
-		return
-	}
+	id := r.PathValue("id")
 
-	err = thunder.DeleteTarget(id)
+	err := thunder.Targets.Delete(id)
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return

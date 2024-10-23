@@ -1,26 +1,30 @@
 package thunder
 
+import "github.com/quix-labs/thunder/utils"
+
 type JsonTarget struct {
-	ID     int    `json:"id"`
+	ID     string `json:"id"`
 	Driver string `json:"driver"`
 	Config any    `json:"config"`
 }
 
-func SerializeTarget(s *Target) (*JsonTarget, error) {
+func SerializeTarget(t *Target) (*JsonTarget, error) {
 	return &JsonTarget{
-		ID:     s.ID,
-		Driver: s.Driver.DriverInfo().ID,
-		Config: s.Config.(any),
+		ID:     t.ID,
+		Driver: t.Driver.ID(),
+		Config: t.Config.(any),
 	}, nil
 }
 
 func UnserializeTarget(js *JsonTarget) (*Target, error) {
-	driver, err := GetTargetDriver(js.Driver)
+	driver, err := TargetDrivers.Get(js.Driver)
 	if err != nil {
 		return nil, err
 	}
 
-	typedConfig, err := ConvertToDynamicConfig(&driver.Config, js.Config)
+	config := driver.Config().Config
+
+	typedConfig, err := utils.ConvertToDynamicConfig(config, js.Config)
 	if err != nil {
 		return nil, err
 	}

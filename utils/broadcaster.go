@@ -64,8 +64,10 @@ func (b *Broadcaster[In, Out]) NewListenChan() (<-chan Out, func()) {
 
 	b.listenChannels.Store(listenChan, true)
 	return listenChan, func() {
-		b.listenChannels.Delete(listenChan)
-		close(listenChan)
+		b._once.Do(func() {
+			b.listenChannels.Delete(listenChan)
+			close(listenChan)
+		})
 	}
 }
 

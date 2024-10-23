@@ -2,7 +2,7 @@ package elastic
 
 import (
 	"fmt"
-	"github.com/quix-labs/thunder"
+	"github.com/quix-labs/thunder/utils"
 	"strings"
 )
 
@@ -34,5 +34,5 @@ func (cfg DriverConfig) Excerpt() string {
 }
 
 var (
-	_ thunder.DynamicConfig = (*DriverConfig)(nil)
+	_ utils.DynamicConfig = (*DriverConfig)(nil)
 )
