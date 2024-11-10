@@ -2,6 +2,7 @@ package elastic
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	_ "embed"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 	"github.com/quix-labs/thunder"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -92,15 +94,18 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 func (d *Driver) processEvent(event thunder.TargetEvent, bulkIndexer *BulkIndexer, index string) error {
 	switch typedEvent := event.(type) {
 	case *thunder.TargetInsertEvent:
+		version := strconv.Itoa(cmp.Compare(typedEvent.Version, int(time.Now().Unix())))
 		return bulkIndexer.Add(
-			[]byte(`{"index":{"_index":"`+index+`","_id":"`+SanitizeJsonString(typedEvent.Pkey)+`"}}`),
+			[]byte(`{"index":{"_index":"`+index+`","_id":"`+SanitizeJsonString(typedEvent.Pkey)+`", "version": `+version+`, "version_type": "external"}}`),
 			typedEvent.Json,
 		)
 	case *thunder.TargetPatchEvent:
+		version := strconv.Itoa(cmp.Compare(typedEvent.Version, int(time.Now().Unix())))
+
 		// Handle base table update
 		if typedEvent.Relation == nil {
 			return bulkIndexer.Add(
-				[]byte(`{"update":{"_index":"`+index+`","_id":"`+SanitizeJsonString(typedEvent.Pkey)+`"}}`),
+				[]byte(`{"update":{"_index":"`+index+`","_id":"`+SanitizeJsonString(typedEvent.Pkey)+`", "version": `+version+`, "version_type": "external"}}`),
 				bytes.Join([][]byte{[]byte(`{"doc":`), typedEvent.JsonPatch, []byte("}")}, []byte("")),
 			)
 		}

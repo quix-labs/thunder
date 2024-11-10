@@ -22,6 +22,7 @@ func ProcessorRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /go-api/processors/{id}", updateProcessor)
 	mux.HandleFunc("DELETE /go-api/processors/{id}", deleteProcessor)
 
+	mux.HandleFunc("POST /go-api/processors/index", indexAllProcessor)
 	mux.HandleFunc("POST /go-api/processors/{id}/index", indexProcessor)
 	mux.HandleFunc("POST /go-api/processors/{id}/start", startProcessor)
 	mux.HandleFunc("POST /go-api/processors/{id}/stop", stopProcessor)
@@ -214,6 +215,61 @@ func deleteProcessor(w http.ResponseWriter, r *http.Request) {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, fmt.Sprintf(`Processor %s deleted!`, id)})
+}
+
+func indexAllProcessor(w http.ResponseWriter, r *http.Request) {
+
+	sync := r.URL.Query().Has("sync")
+
+	if sync {
+		var eg, egCtx = errgroup.WithContext(r.Context())
+
+		processors := thunder.Processors.All()
+
+		groupedErr := make(map[string]string, len(processors))
+		for _, processor := range processors {
+			//id := id
+			eg.Go(func() error {
+				start := time.Now()
+				err := processor.FullIndex(egCtx)
+				if err != nil {
+					groupedErr[processor.Index] = err.Error()
+				} else {
+					groupedErr[processor.Index] = fmt.Sprintf("indexed, took %fs!", time.Since(start).Seconds())
+				}
+				return nil // Do not return error but append to error array
+			})
+		}
+
+		if err := eg.Wait(); err != nil {
+			writeJsonError(w, http.StatusInternalServerError, err, "")
+			return
+		}
+
+		writeJsonResponse(w, http.StatusOK, struct {
+			Success bool              `json:"success"`
+			Results map[string]string `json:"results"`
+		}{true, groupedErr})
+		return
+	}
+
+	// BACKGROUND RUN
+	for id, processor := range thunder.Processors.All() {
+		go func() {
+			thunder.GetLoggerForModule("thunder.api").Info().Msgf("Processor %s has started in the background", id)
+			err := processor.FullIndex(context.Background())
+			if err != nil {
+				thunder.GetLoggerForModule("thunder.api").Error().Msgf("an error occurred during indexing of processor %s: %s", id, err.Error())
+				return
+			}
+			thunder.GetLoggerForModule("thunder.api").Info().Msgf("Processor %s has finished in the background", id)
+		}()
+	}
+
+	writeJsonResponse(w, http.StatusAccepted, struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{true, "Indexing claimed"})
 }
 
 func indexProcessor(w http.ResponseWriter, r *http.Request) {

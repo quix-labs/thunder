@@ -33,13 +33,15 @@ type TargetDriver interface {
 // Event
 
 type TargetInsertEvent struct {
-	Pkey string
-	Json []byte
+	Pkey    string
+	Version int
+	Json    []byte
 }
 
 type TargetPatchEvent struct {
 	Relation  *Relation
 	Pkey      string
+	Version   int
 	JsonPatch []byte
 }
 

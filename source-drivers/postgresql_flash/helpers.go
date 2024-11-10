@@ -75,6 +75,7 @@ func GetSqlForProcessor(processor *thunder.Processor) (string, error) {
 	}
 	query = query.SelectAppend(
 		goqu.L("?::TEXT", goqu.Func("to_json", goqu.L(fmt.Sprintf("ARRAY[%s]::text[]", strings.Join(bindings, ",")), args...))).As("Pkey"),
+		goqu.Func("txid_current").As("Version"),
 	)
 
 	sql, _, _ := query.ToSQL()
@@ -243,7 +244,6 @@ func GetResult[T any](conn *pgx.Conn, query string, in chan<- *T, ctx context.Co
 			// Use other select to prevent canceled context during previous operation
 			select {
 			case <-ctx.Done():
-				fmt.Println("ok - x")
 				return ctx.Err()
 			case in <- &document:
 			}

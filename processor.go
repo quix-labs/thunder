@@ -48,7 +48,9 @@ type Processor struct {
 }
 
 type Document struct {
-	Pkey string `json:"_pkey"`
+	Pkey    string `json:"_pkey"`
+	Version int    `json:"_version"`
+
 	Json []byte `json:"json"`
 }
 
@@ -78,6 +80,7 @@ func (p *Processor) Start() error {
 			return &TargetPatchEvent{
 				Relation:  typedEvent.Relation,
 				Pkey:      typedEvent.Pkey,
+				Version:   typedEvent.Version,
 				JsonPatch: typedEvent.JsonPatch,
 			}
 
@@ -187,8 +190,9 @@ func (p *Processor) FullIndex(ctx context.Context) error {
 						case <-targetEgCtx.Done():
 							return targetEgCtx.Err()
 						case chanToSend <- &TargetInsertEvent{
-							Pkey: doc.Pkey,
-							Json: doc.Json,
+							Pkey:    doc.Pkey,
+							Version: doc.Version,
+							Json:    doc.Json,
 						}:
 							return nil
 						}

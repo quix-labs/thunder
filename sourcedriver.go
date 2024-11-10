@@ -46,12 +46,13 @@ type SourceDriver interface {
 // Events
 
 type DbInsertEvent struct {
-	Pkey string
+	Pkey    string
+	Version int
 }
 
 type DbPatchEvent struct {
-	Relation *Relation
-
+	Relation  *Relation
+	Version   int
 	Pkey      string
 	JsonPatch []byte
 }
