@@ -58,11 +58,11 @@ func (d *Driver) TestConfig() (string, error) {
 }
 
 func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
-	conn, err := d.newConn()
+	conn, err := d.newConn(context.TODO())
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close(context.Background())
+	defer conn.Close(context.Background()) // TODO ERROR JOIN AT THE END
 
 	query := StatsQuery(d.config.Schema)
 	stats := thunder.SourceDriverStats{}
@@ -85,7 +85,7 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 	return &stats, nil
 }
 
-func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, in utils.BroadcasterIn[*thunder.Document], limit uint64) error {
+func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, in chan<- *thunder.Document, ctx context.Context, limit uint64) error {
 	query, err := GetSqlForProcessor(processor)
 	if err != nil {
 		return err
@@ -94,17 +94,14 @@ func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, in utils
 		query = fmt.Sprintf("%s LIMIT %s", query, strconv.FormatUint(limit, 10))
 	}
 
-	conn, err := d.newConn()
+	conn, err := d.newConn(ctx)
 	if err != nil {
 		return err
 	}
-	defer conn.Close(context.Background())
 
-	if err := GetResult[thunder.Document](conn, query, in); err != nil {
-		return err
-	}
-
-	return nil
+	resultErr := GetResult[thunder.Document](conn, query, in, ctx)
+	closeErr := conn.Close(ctx)
+	return errors.Join(resultErr, closeErr)
 }
 
 func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEvent]) error {
@@ -112,7 +109,7 @@ func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEv
 	publicationSlotPrefix := "thunder_p" + p.ID
 	replicationSlot := "thunder_replication_p" + p.ID
 
-	conn, err := d.newConn()
+	conn, err := d.newConn(context.TODO())
 	if err != nil {
 		return err
 	}
@@ -149,7 +146,7 @@ func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEv
 		//	ReplicationSlot:       replicationSlot,
 		//}),
 		Driver: trigger.NewDriver(&trigger.DriverConfig{
-			Schema: fmt.Sprintf("thunder%d", p.ID),
+			Schema: fmt.Sprintf("thunder%s", p.ID),
 		}),
 	})
 
@@ -285,7 +282,7 @@ func (d *Driver) Stop() error {
 	return nil
 }
 
-func (d *Driver) newConn() (*pgx.Conn, error) {
+func (d *Driver) newConn(ctx context.Context) (*pgx.Conn, error) {
 	pgConnConfig, err := pgx.ParseConfig("postgres://u:s@l:5432/d?sslmode=disable") // Keep sslMode to work in scratch docker
 	if err != nil {
 		return nil, err
@@ -296,7 +293,7 @@ func (d *Driver) newConn() (*pgx.Conn, error) {
 	pgConnConfig.Password = d.config.Password
 	pgConnConfig.Database = d.config.Database
 
-	pgConn, err := pgx.ConnectConfig(context.Background(), pgConnConfig)
+	pgConn, err := pgx.ConnectConfig(ctx, pgConnConfig)
 	if err != nil {
 		return nil, err
 	}

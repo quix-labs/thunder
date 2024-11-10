@@ -1,15 +1,13 @@
 package controllers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
-	"github.com/quix-labs/thunder/utils"
 	"log"
 	"net/http"
-	"os"
-	"sync/atomic"
 	"time"
 )
 
@@ -90,40 +88,38 @@ func testProcessor(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Start indexing
-	broadcaster := utils.NewBroadcaster[*thunder.Document, *thunder.Document](func(doc *thunder.Document) *thunder.Document {
-		return doc
-	})
-	broadcaster.Start()
-	defer broadcaster.Close()
-
-	var errChan = make(chan error)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 
 	// Start source
+	var inChan = make(chan *thunder.Document)
+	var errChan = make(chan error)
+
 	go func() {
-		defer broadcaster.In().Finish()
-		if err := processor.Source.Driver.GetDocumentsForProcessor(processor, broadcaster.In(), 1); err != nil {
-			errChan <- err
-		}
+		defer close(inChan)
+		errChan <- processor.Source.Driver.GetDocumentsForProcessor(processor, inChan, ctx, 1)
+		close(errChan)
 	}()
 
-	// Start receiver
-	listenChan, _ := broadcaster.NewListenChan()
-
 	select {
-	case doc, open := <-listenChan:
+	case <-ctx.Done():
+		writeJsonError(w, http.StatusInternalServerError, ctx.Err(), "")
+		return
+	case err := <-errChan:
+		if err != nil {
+			writeJsonError(w, http.StatusInternalServerError, err, "")
+		}
+	case doc, open := <-inChan:
 		if !open {
-			writeJsonResponse(w, http.StatusOK, nil)
+			// Channel is closed, return 204 No Content
+			writeJsonResponse(w, http.StatusNoContent, nil)
 			return
 		}
 
+		// Successfully received a document, write it to the response
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(doc.Json)
-		return
-	case err := <-errChan:
-		writeJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	case <-time.After(time.Second * 5):
-		writeJsonError(w, http.StatusInternalServerError, errors.New("timeout reached"), "database took more than 5s to generate document")
 		return
 	}
 }
@@ -197,7 +193,7 @@ func updateProcessor(w http.ResponseWriter, r *http.Request) {
 	writeJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
-	}{true, fmt.Sprintf("Processor %d updated", id)})
+	}{true, fmt.Sprintf("Processor %s updated", id)})
 }
 
 func deleteProcessor(w http.ResponseWriter, r *http.Request) {
@@ -214,7 +210,7 @@ func deleteProcessor(w http.ResponseWriter, r *http.Request) {
 	writeJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
-	}{true, fmt.Sprintf(`Processor %d deleted!`, id)})
+	}{true, fmt.Sprintf(`Processor %s deleted!`, id)})
 }
 
 func indexProcessor(w http.ResponseWriter, r *http.Request) {
@@ -225,13 +221,25 @@ func indexProcessor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go func() {
+	sync := r.URL.Query().Has("sync")
+
+	if sync {
 		if err := processor.FullIndex(); err != nil {
-			return // TODO
+			writeJsonError(w, http.StatusInternalServerError, err, "error during indexing")
+			return
 		}
+		writeJsonResponse(w, http.StatusOK, struct {
+			Success bool   `json:"success"`
+			Message string `json:"message"`
+		}{true, "indexing succeed"})
+		return
+	}
+
+	go func() {
+		_ = processor.FullIndex()
 	}()
 
-	writeJsonResponse(w, http.StatusOK, struct {
+	writeJsonResponse(w, http.StatusAccepted, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, "Indexing claimed"})
@@ -255,7 +263,7 @@ func startProcessor(w http.ResponseWriter, r *http.Request) {
 	writeJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
-	}{true, fmt.Sprintf("Processor %d started", id)})
+	}{true, fmt.Sprintf("Processor %s started", id)})
 }
 
 func stopProcessor(w http.ResponseWriter, r *http.Request) {
@@ -273,127 +281,128 @@ func stopProcessor(w http.ResponseWriter, r *http.Request) {
 	writeJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
-	}{true, fmt.Sprintf("Processor %d stopped", id)})
+	}{true, fmt.Sprintf("Processor %s stopped", id)})
 }
 
 func downloadProcessor(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-
-	processor, err := thunder.Processors.Get(id)
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
-		return
-	}
-
-	exporter := r.FormValue("exporter")
-	if exporter == "" {
-		exporter = "csv"
-	}
-
-	filename := r.FormValue("filename")
-	if filename == "" {
-		filename = fmt.Sprintf("processor-%d.%s", id, exporter)
-	}
-
-	exporterInstance, err := thunder.Exporters.Get(exporter)
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, fmt.Sprintf("invalid exporter: %s", exporter))
-		return
-	}
-
-	// Start indexing
-	broadcaster := utils.NewBroadcaster[*thunder.Document, *thunder.Document](func(doc *thunder.Document) *thunder.Document {
-		return doc
-	})
-	broadcaster.Start()
-	defer broadcaster.Close()
-
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "thunder-")
-	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
-	defer tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
-
-	// Instantiate transformer writer
-	if err := exporterInstance.Load(tmpFile); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
-
-	// Start receiver
-	listenChan, stopListening := broadcaster.NewListenChan()
-	transformerErrorChan := make(chan error, 1)
-	go func() {
-		defer close(transformerErrorChan)
-		var position atomic.Uint64
-		for doc := range listenChan {
-			position.Add(1)
-			if position.Load() == 1 {
-				if err := exporterInstance.BeforeAll(); err != nil {
-					transformerErrorChan <- err
-					return
-				}
-			}
-
-			if err := exporterInstance.WriteDocument(doc, position.Load()); err != nil {
-				transformerErrorChan <- err
-				return
-			}
-		}
-
-		if position.Load() >= 1 {
-			if err := exporterInstance.AfterAll(); err != nil {
-				transformerErrorChan <- err
-				return
-			}
-		}
-		transformerErrorChan <- nil
-	}()
-
-	sourceErrChan := make(chan error, 1)
-	go func() {
-		defer close(sourceErrChan)
-		sourceErrChan <- processor.Source.Driver.GetDocumentsForProcessor(processor, broadcaster.In(), 0)
-	}()
-
-	for {
-		select {
-		case err := <-sourceErrChan:
-			broadcaster.In().Finish()
-			stopListening()
-			if err != nil {
-				writeJsonError(w, http.StatusInternalServerError, err, "")
-				return
-			}
-
-		case err := <-transformerErrorChan:
-			if err != nil {
-				writeJsonError(w, http.StatusInternalServerError, err, "")
-				broadcaster.In().Finish()
-				stopListening()
-				return
-			}
-
-			// Rewind the temporary file to the beginning
-			if _, err := tmpFile.Seek(0, 0); err != nil {
-				writeJsonError(w, http.StatusInternalServerError, err, "")
-				return
-			}
-
-			// Stream temporary file
-			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
-			w.Header().Set("Cache-Control", "private")
-			w.Header().Set("Pragma", "private")
-
-			if mimeType := exporterInstance.MimeType(); mimeType != "" {
-				w.Header().Set("Content-Type", mimeType)
-			}
-
-			http.ServeContent(w, r, filename, time.Now(), tmpFile)
-			return
-		}
-	}
+	//TODO REWRITE
+	//id := r.PathValue("id")
+	//
+	//processor, err := thunder.Processors.Get(id)
+	//if err != nil {
+	//	writeJsonError(w, http.StatusBadRequest, err, "")
+	//	return
+	//}
+	//
+	//exporter := r.FormValue("exporter")
+	//if exporter == "" {
+	//	exporter = "csv"
+	//}
+	//
+	//filename := r.FormValue("filename")
+	//if filename == "" {
+	//	filename = fmt.Sprintf("processor-%d.%s", id, exporter)
+	//}
+	//
+	//exporterInstance, err := thunder.Exporters.Get(exporter)
+	//if err != nil {
+	//	writeJsonError(w, http.StatusBadRequest, err, fmt.Sprintf("invalid exporter: %s", exporter))
+	//	return
+	//}
+	//
+	//// Start indexing
+	//broadcaster := utils.NewBroadcaster[*thunder.Document, *thunder.Document](func(doc *thunder.Document) *thunder.Document {
+	//	return doc
+	//})
+	//broadcaster.Start()
+	//defer broadcaster.Close()
+	//
+	//// Create temporary file
+	//tmpFile, err := os.CreateTemp("", "thunder-")
+	//if err != nil {
+	//	writeJsonError(w, http.StatusInternalServerError, err, "")
+	//	return
+	//}
+	//defer tmpFile.Close()
+	//defer os.Remove(tmpFile.Name())
+	//
+	//// Instantiate transformer writer
+	//if err := exporterInstance.Load(tmpFile); err != nil {
+	//	writeJsonError(w, http.StatusInternalServerError, err, "")
+	//	return
+	//}
+	//
+	//// Start receiver
+	//listenChan, stopListening := broadcaster.NewListenChan()
+	//transformerErrorChan := make(chan error, 1)
+	//go func() {
+	//	defer close(transformerErrorChan)
+	//	var position atomic.Uint64
+	//	for doc := range listenChan {
+	//		position.Add(1)
+	//		if position.Load() == 1 {
+	//			if err := exporterInstance.BeforeAll(); err != nil {
+	//				transformerErrorChan <- err
+	//				return
+	//			}
+	//		}
+	//
+	//		if err := exporterInstance.WriteDocument(doc, position.Load()); err != nil {
+	//			transformerErrorChan <- err
+	//			return
+	//		}
+	//	}
+	//
+	//	if position.Load() >= 1 {
+	//		if err := exporterInstance.AfterAll(); err != nil {
+	//			transformerErrorChan <- err
+	//			return
+	//		}
+	//	}
+	//	transformerErrorChan <- nil
+	//}()
+	//
+	//sourceErrChan := make(chan error, 1)
+	//go func() {
+	//	defer close(sourceErrChan)
+	//	sourceErrChan <- processor.Source.Driver.GetDocumentsForProcessor(processor, broadcaster.In(), 0)
+	//}()
+	//
+	//for {
+	//	select {
+	//	case err := <-sourceErrChan:
+	//		broadcaster.In().Finish()
+	//		stopListening()
+	//		if err != nil {
+	//			writeJsonError(w, http.StatusInternalServerError, err, "")
+	//			return
+	//		}
+	//
+	//	case err := <-transformerErrorChan:
+	//		if err != nil {
+	//			writeJsonError(w, http.StatusInternalServerError, err, "")
+	//			broadcaster.In().Finish()
+	//			stopListening()
+	//			return
+	//		}
+	//
+	//		// Rewind the temporary file to the beginning
+	//		if _, err := tmpFile.Seek(0, 0); err != nil {
+	//			writeJsonError(w, http.StatusInternalServerError, err, "")
+	//			return
+	//		}
+	//
+	//		// Stream temporary file
+	//		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	//		w.Header().Set("Cache-Control", "private")
+	//		w.Header().Set("Pragma", "private")
+	//
+	//		if mimeType := exporterInstance.MimeType(); mimeType != "" {
+	//			w.Header().Set("Content-Type", mimeType)
+	//		}
+	//
+	//		http.ServeContent(w, r, filename, time.Now(), tmpFile)
+	//		return
+	//	}
+	//}
 }

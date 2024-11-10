@@ -8,7 +8,6 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v5"
 	"github.com/quix-labs/thunder"
-	"github.com/quix-labs/thunder/utils"
 	"math/rand"
 	"reflect"
 	"strconv"
@@ -224,20 +223,29 @@ func GetResultsSync[T any](conn *pgx.Conn, query string, timeout time.Duration, 
 	}
 }
 
-func GetResult[T any](conn *pgx.Conn, query string, in utils.BroadcasterIn[*T]) error {
-	result, err := conn.Query(context.Background(), query)
+func GetResult[T any](conn *pgx.Conn, query string, in chan<- *T, ctx context.Context) error {
+	result, err := conn.Query(ctx, query)
 	if err != nil {
 		return err
 	}
 	defer result.Close()
 
 	for result.Next() {
-		document, err := pgx.RowToStructByName[T](result)
-		if err != nil {
-			return err
-		}
-		if in.Broadcast(&document) == false {
-			return nil
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			document, err := pgx.RowToStructByName[T](result)
+			if err != nil {
+				return err
+			}
+
+			// Use other select to prevent canceled context during previous operation
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case in <- &document:
+			}
 		}
 	}
 

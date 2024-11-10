@@ -1,6 +1,7 @@
 package thunder
 
 import (
+	"context"
 	"errors"
 	"github.com/quix-labs/thunder/utils"
 	"github.com/rs/zerolog"
@@ -34,7 +35,7 @@ type SourceDriver interface {
 	Stats() (*SourceDriverStats, error)
 
 	// GetDocumentsForProcessor use limit=0 to unlimited
-	GetDocumentsForProcessor(processor *Processor, in utils.BroadcasterIn[*Document], limit uint64) error
+	GetDocumentsForProcessor(processor *Processor, in chan<- *Document, ctx context.Context, limit uint64) error
 
 	// Real Time Indexing
 

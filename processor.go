@@ -1,11 +1,13 @@
 package thunder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/oklog/ulid/v2"
 	"github.com/quix-labs/thunder/utils"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 	"os"
 	"sync/atomic"
 	"time"
@@ -100,7 +102,7 @@ func (p *Processor) Start() error {
 	for _, target := range p.Targets {
 		go func() {
 			listenChan, stopListening := p.ListenBroadcaster.NewListenChan()
-			if err := target.Driver.HandleEvents(p, listenChan); err != nil {
+			if err := target.Driver.HandleEvents(p, listenChan, context.TODO()); err != nil {
 				stopListening()
 				//				broadcaster.Close() Uncomment to stop emission
 				//TODO error
@@ -135,44 +137,81 @@ func (p *Processor) FullIndex() error {
 	p.Indexing.Store(true)
 	defer p.Indexing.Store(false)
 
-	// Start indexing
-	broadcaster := utils.NewBroadcaster[*Document, TargetEvent](func(doc *Document) TargetEvent {
-		return &TargetInsertEvent{
-			Pkey: doc.Pkey,
-			Json: doc.Json,
-		}
-	})
-	broadcaster.Start()
-	defer broadcaster.Close()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
 
-	//eg, ctx := errgroup.WithContext(context.Background())
+	eg, egCtx := errgroup.WithContext(ctx)
 
-	// Start targets
-	for _, target := range p.Targets {
-		//eg.Go(func() error {
-		//	return target.Driver.HandleEvents(p)
-		//})
-		go func() {
-			listenChan, stopListening := broadcaster.NewListenChan()
-			defer stopListening()
-			if err := target.Driver.HandleEvents(p, listenChan); err != nil {
-				stopListening()
-				//				broadcaster.Close() Uncomment to stop emission
-				//TODO error handling
-			}
-		}()
+	// Initialize each channel individually
+	var targetChans = make([]chan TargetEvent, len(p.Targets))
+	for i := range targetChans {
+		targetChans[i] = make(chan TargetEvent) // create an actual channel for each slice element
 	}
 
-	// Start source
-	go func() {
-		defer broadcaster.In().Finish()
-		if err := p.Source.Driver.GetDocumentsForProcessor(p, broadcaster.In(), 0); err != nil {
-			fmt.Println("error in getting documents for processor")
-		}
-	}()
+	// Start targets in parallel
+	for i, target := range p.Targets {
+		targetChan := targetChans[i] // capture channel locally
+		eg.Go(func() error {
+			return target.Driver.HandleEvents(p, targetChan, egCtx)
+		})
+	}
 
-	broadcaster.Wait()
-	return nil
+	// Start source in background
+	inChan := make(chan *Document)
+	eg.Go(func() error {
+		defer close(inChan)
+		return p.Source.Driver.GetDocumentsForProcessor(p, inChan, egCtx, 0)
+	})
+
+	var docCount atomic.Uint64
+
+	// Start dispatcher
+	eg.Go(func() error {
+		defer func() {
+			for _, targetChan := range targetChans {
+				close(targetChan) // close target channels when done
+			}
+		}()
+
+		for {
+			select {
+			case <-egCtx.Done():
+				return egCtx.Err()
+			case <-time.After(time.Second * 10):
+				cancel(context.DeadlineExceeded)
+			case doc, ok := <-inChan:
+				if !ok {
+					return nil
+				}
+				docCount.Add(1)
+				for _, targetChan := range targetChans {
+					targetChan <- &TargetInsertEvent{
+						Pkey: doc.Pkey,
+						Json: doc.Json,
+					}
+				}
+			}
+		}
+	})
+
+	start := time.Now()
+	err := eg.Wait()
+	totalTime := time.Since(start)
+	totalTimeMs := totalTime.Milliseconds()
+	totalSeconds := totalTime.Seconds()
+	docsPerSec := float64(docCount.Load()) / totalSeconds
+	meanDocTimeMs := float64(totalTimeMs) / float64(docCount.Load())
+
+	fmt.Println("Total Time (s):", totalSeconds)
+	fmt.Println("Documents Processed:", docCount.Load())
+	fmt.Println("Documents per second:", docsPerSec)
+	fmt.Println("Mean Time per Document (ms):", meanDocTimeMs)
+	fmt.Println("Total Time (ms):", totalTimeMs)
+
+	if errors.Is(err, context.Canceled) {
+		return context.Cause(egCtx)
+	}
+	return err
 }
 
 func GetLoggerForProcessor(processor *Processor) *zerolog.Logger {

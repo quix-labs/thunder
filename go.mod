@@ -1,6 +1,6 @@
 module github.com/quix-labs/thunder
 
-go 1.22
+go 1.23
 
 require (
 	github.com/creasty/defaults v1.8.0
@@ -11,6 +11,7 @@ require (
 	github.com/quix-labs/flash v0.0.0-20240715105610-d3fe20e10139
 	github.com/quix-labs/flash/drivers/trigger v0.0.0-20240715105610-d3fe20e10139
 	github.com/rs/zerolog v1.33.0
+	golang.org/x/sync v0.8.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 

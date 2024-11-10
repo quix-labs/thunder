@@ -7,11 +7,14 @@ import (
 )
 
 type DriverConfig struct {
-	Endpoint           string `type:"url" required:"true" default:"http://localhost:9200"`
-	Username           string
-	Password           string `type:"password"`
-	BatchSize          int    `type:"number" label:"Batch size" default:"100" min:"1" help:"Use 1 to disable batching (not recommended)"`
-	ReactivityInterval int    `type:"number" label:"Reactivity Interval (in sec)" default:"10" min:"1" help:"Max time without data before flushing changes to the index"`
+	Endpoint string `type:"url" required:"true" default:"http://localhost:9200"`
+	Username string
+	Password string `type:"password"`
+
+	BatchMaxBytesSize int `type:"number" label:"Maximum Batch Size (Kilobytes)" default:"5120" min:"1024" help:"Maximum size of each batch in Kilobytes. (Default to 5MB)"`
+	ParallelBatch     int `type:"number" label:"Parallel Batches" default:"4" min:"1" help:"Number of batches to send in parallel. Use 1 to disable parallel processing, which may slow down processing."`
+
+	ReactivityInterval int `type:"number" label:"Reactivity Interval (in sec)" default:"10" min:"1" help:"Max time without data before flushing changes to the index"`
 	Prefix             string
 }
 
