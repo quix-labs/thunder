@@ -10,7 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "@nuxt/ui": "https://pkg.pr.new/@nuxt/ui@v3",
+    "@nuxt/ui": "https://pkg.pr.new/@nuxt/ui@3f48fdae8d31e188d60b864edd452163ae726109",
     "nuxt": "^3.13.2",
     "vue": "^3.5.4"
   },

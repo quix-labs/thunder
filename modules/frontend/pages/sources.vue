@@ -15,23 +15,45 @@
       <span class="font-medium">Total:&nbsp;</span>
       <span>{{ rows?.length || 0 }}&nbsp;sources</span>
     </template>
+    <UTable v-model:sorting="sorting" class="flex-1"
+            :columns="columns" :data="rows" :loading="['idle','pending'].includes(status)"/>
   </UCard>
+
 </template>
 
 
 <script setup lang="ts">
-import {FormSource} from "#components";
+import {FormSource, UButton} from "#components";
 import KbdButton from "~/components/KbdButton.vue";
+import type { TableColumn } from '@nuxt/ui'
 
 const {status, data: sources, refresh} = useSources()
 const slideoverOpen = useSlideover()?.isOpen
 
-const columns = [
-  {key: 'id', label: '#', sortable: true, rowClass: 'w-[1px] whitespace-nowrap'},
-  {key: 'excerpt', label: 'Excerpt', sortable: true},
-  {key: 'driver', label: 'Driver', sortable: true},
-  {key: 'actions', sortable: false, rowClass: 'w-[1px] whitespace-nowrap'}
+const columns: TableColumn<any>[] = [
+  {
+    accessorKey: 'id',
+    header: ({column}) => {
+      const isSorted = column.getIsSorted()
+
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: '#',
+        icon: isSorted ? isSorted === 'asc' ? 'i-heroicons-bars-arrow-up-20-solid' : 'i-heroicons-bars-arrow-down-20-solid' : 'i-heroicons-arrows-up-down-20-solid',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    }
+  },
+  {accessorKey: 'excerpt', header: 'Excerpt'},
+  {accessorKey: 'driver', header: 'Driver'},
+  {accessorKey: 'actions', header: ''}
 ]
+const sorting = ref([{
+  id: 'id',
+  desc: true
+}])
 
 const rows = computed(() => sources.value?.map(source => ({
   id: source.id,

@@ -145,8 +145,13 @@ func (p *Processor) FullIndex() error {
 	broadcaster.Start()
 	defer broadcaster.Close()
 
+	//eg, ctx := errgroup.WithContext(context.Background())
+
 	// Start targets
 	for _, target := range p.Targets {
+		//eg.Go(func() error {
+		//	return target.Driver.HandleEvents(p)
+		//})
 		go func() {
 			listenChan, stopListening := broadcaster.NewListenChan()
 			defer stopListening()

@@ -36,3 +36,5 @@ func (cfg DriverConfig) Excerpt() string {
 var (
 	_ utils.DynamicConfig = (*DriverConfig)(nil)
 )
+
+func main() {}

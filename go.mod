@@ -7,6 +7,7 @@ require (
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
 	github.com/jackc/pgx/v5 v5.7.1
+	github.com/oklog/ulid/v2 v2.1.0
 	github.com/quix-labs/flash v0.0.0-20240715105610-d3fe20e10139
 	github.com/quix-labs/flash/drivers/trigger v0.0.0-20240715105610-d3fe20e10139
 	github.com/rs/zerolog v1.33.0
@@ -23,7 +24,6 @@ require (
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/oklog/ulid/v2 v2.1.0 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	go.opentelemetry.io/otel v1.24.0 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
