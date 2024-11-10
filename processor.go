@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -184,16 +185,25 @@ func (p *Processor) FullIndex() error {
 					return nil
 				}
 				docCount.Add(1)
+
+				// Send event across all channels in parallel
+				var wg sync.WaitGroup
 				for _, targetChan := range targetChans {
-					targetChan <- &TargetInsertEvent{
-						Pkey: doc.Pkey,
-						Json: doc.Json,
-					}
+					wg.Add(1)
+					go func(chanToSend chan TargetEvent) {
+						defer wg.Done()
+						chanToSend <- &TargetInsertEvent{
+							Pkey: doc.Pkey,
+							Json: doc.Json,
+						}
+					}(targetChan)
 				}
+				wg.Wait()
 			}
 		}
 	})
 
+	//TODO REMOVE STATS
 	start := time.Now()
 	err := eg.Wait()
 	totalTime := time.Since(start)
