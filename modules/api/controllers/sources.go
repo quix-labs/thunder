@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
-	"log"
 	"net/http"
 )
 
@@ -53,7 +52,7 @@ func createSource(w http.ResponseWriter, r *http.Request) {
 		if errors.As(err, &mr) {
 			http.Error(w, mr.Msg, mr.Status)
 		} else {
-			log.Print(err.Error())
+			thunder.GetLoggerForModule("thunder.api").Error().Msg(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
 		return
@@ -92,7 +91,7 @@ func updateSource(w http.ResponseWriter, r *http.Request) {
 		if errors.As(err, &mr) {
 			http.Error(w, mr.Msg, mr.Status)
 		} else {
-			log.Print(err.Error())
+			thunder.GetLoggerForModule("thunder.api").Error().Msg(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
 		return

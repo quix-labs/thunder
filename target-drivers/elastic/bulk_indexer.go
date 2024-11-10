@@ -44,7 +44,7 @@ func NewBulkIndexer(client *elasticsearch.TypedClient, batchMaxBytesSize int64, 
 	}
 }
 
-func (bi *BulkIndexer) Add(lines ...[]byte) {
+func (bi *BulkIndexer) Add(lines ...[]byte) error {
 	bi.mu.Lock()
 	bi._queue = append(bi._queue, lines)
 	bi.mu.Unlock()
@@ -52,14 +52,15 @@ func (bi *BulkIndexer) Add(lines ...[]byte) {
 	bi.pendingOperations.Add(bi._incrementFn(&lines))
 
 	if bi.pendingOperations.Load() >= (bi.BatchMaxBytesSize * bi.ParallelBatch) {
-		bi.flush()
+		return bi.flush()
 	}
+	return nil
 }
 
 func (bi *BulkIndexer) Close() {
 	bi._closeOnce.Do(func() {
 		if bi.pendingOperations.Load() > 0 {
-			bi.flush()
+			bi.flush() // TODO ERR
 		}
 	})
 }
@@ -78,17 +79,17 @@ func (bi *BulkIndexer) AddSendTimeout(duration time.Duration) {
 			bi.mu.Unlock()
 
 			if pendingOps > 0 && timeSinceLastSend >= duration {
-				bi.flush()
+				bi.flush() //TODO
 			}
 		}
 	}()
 }
 
-func (bi *BulkIndexer) flush() {
+func (bi *BulkIndexer) flush() error {
 	bi.mu.Lock()
 	defer bi.mu.Unlock()
 
-	var eg = new(errgroup.Group)
+	var eg = new(errgroup.Group) // TODO CONTEXT
 
 	buffer := make([]byte, 0, int(bi.BatchMaxBytesSize))
 
@@ -118,14 +119,13 @@ func (bi *BulkIndexer) flush() {
 		})
 	}
 
-	err := eg.Wait()
-	if err != nil {
-		panic(err)
-		return
+	if err := eg.Wait(); err != nil {
+		return err
 	}
 
 	bi._lastSent = time.Now()
 	bi.pendingOperations.Store(int64(0))
 
 	bi._queue = bi._queue[:0]
+	return nil
 }

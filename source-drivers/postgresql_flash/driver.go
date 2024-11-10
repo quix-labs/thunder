@@ -62,7 +62,6 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close(context.Background()) // TODO ERROR JOIN AT THE END
 
 	query := StatsQuery(d.config.Schema)
 	stats := thunder.SourceDriverStats{}
@@ -73,8 +72,10 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 	}
 
 	results, err := GetResultsSync[RowResult](conn, query, time.Second*10, false)
+	closeErr := conn.Close(context.Background())
+
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, closeErr)
 	}
 	for _, result := range results {
 		stats[result.Name] = thunder.SourceDriverStatsTable{
@@ -82,7 +83,7 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 			PrimaryKeys: result.PrimaryKeys,
 		}
 	}
-	return &stats, nil
+	return &stats, closeErr
 }
 
 func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, in chan<- *thunder.Document, ctx context.Context, limit uint64) error {

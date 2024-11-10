@@ -243,6 +243,7 @@ func GetResult[T any](conn *pgx.Conn, query string, in chan<- *T, ctx context.Co
 			// Use other select to prevent canceled context during previous operation
 			select {
 			case <-ctx.Done():
+				fmt.Println("ok - x")
 				return ctx.Err()
 			case in <- &document:
 			}

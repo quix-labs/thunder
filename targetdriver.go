@@ -1,7 +1,6 @@
 package thunder
 
 import (
-	"context"
 	"errors"
 	"github.com/quix-labs/thunder/utils"
 	"github.com/rs/zerolog"
@@ -26,7 +25,7 @@ type TargetDriver interface {
 
 	TestConfig() (string, error) // TODO USELESS REPLACE IN FAVOR OF STATS TO CHECK NOT EMPTY
 
-	HandleEvents(processor *Processor, eventsChan <-chan TargetEvent, ctx context.Context) error
+	HandleEvents(processor *Processor, eventsChan <-chan TargetEvent) error
 
 	Shutdown() error
 }

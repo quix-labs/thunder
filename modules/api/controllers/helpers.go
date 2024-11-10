@@ -13,9 +13,10 @@ func writeJsonResponse(w http.ResponseWriter, statusCode int, response interface
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	_, err = w.Write(marshal)
+	_, err = w.Write(append(marshal, '\n'))
 	if err != nil {
 		writeJsonError(w, http.StatusInternalServerError, err, "")
 	}
@@ -39,7 +40,7 @@ func writeJsonError(w http.ResponseWriter, statusCode int, error error, message 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
-	_, err = w.Write(marshal)
+	_, err = w.Write(append(marshal, '\n'))
 	if err != nil {
 		log.Println(err)
 	}

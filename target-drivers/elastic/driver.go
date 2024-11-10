@@ -64,7 +64,7 @@ func (d *Driver) TestConfig() (string, error) {
 	return fmt.Sprintf(`successfully connected, cluster: "%s"`, res.ClusterName), nil
 }
 
-func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan thunder.TargetEvent, ctx context.Context) error {
+func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan thunder.TargetEvent) error {
 	bulkIndexer := NewBulkIndexer(d.client, int64(d.config.BatchMaxBytesSize*1024), int64(d.config.ParallelBatch))
 	defer bulkIndexer.Close()
 	bulkIndexer.AddSendTimeout(time.Second * time.Duration(d.config.ReactivityInterval))
@@ -72,23 +72,13 @@ func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan th
 	index := d.config.Prefix + processor.Index
 	var dataReceived atomic.Bool
 
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case event, open := <-eventsChan:
-			if !open {
-				goto flushIndex
-			}
-
-			dataReceived.Store(true)
-			if err := d.processEvent(event, bulkIndexer, index, ctx); err != nil {
-				return err
-			}
+	for event := range eventsChan {
+		dataReceived.Store(true)
+		if err := d.processEvent(event, bulkIndexer, index); err != nil {
+			return err
 		}
 	}
 
-flushIndex:
 	if dataReceived.Load() {
 		bulkIndexer.Close()
 		_, err := d.client.Indices.Flush().Index(index).Do(context.Background())
@@ -99,56 +89,20 @@ flushIndex:
 	return nil
 }
 
-//func (d *Driver) HandleEvents(processor *thunder.Processor, eventsChan <-chan thunder.TargetEvent, ctx context.Context) error {
-//	bulkIndexer := NewBulkIndexer(d.client, int64(d.config.BatchMaxBytesSize*1024), int64(d.config.ParallelBatch))
-//	defer bulkIndexer.Close()
-//	bulkIndexer.AddSendTimeout(time.Second * time.Duration(d.config.ReactivityInterval))
-//
-//	index := d.config.Prefix + processor.Index
-//
-//	var dataReceived atomic.Bool
-//
-//	for {
-//		select {
-//		case <-ctx.Done():
-//			return ctx.Err()
-//		case event, open := <-eventsChan:
-//			if !open {
-//				goto flushIndex
-//			}
-//			dataReceived.Store(true)
-//
-//			if err := d.processEvent(event, bulkIndexer, index, ctx); err != nil {
-//				return err
-//			}
-//		}
-//	}
-//
-//flushIndex:
-//	if dataReceived.Load() {
-//		bulkIndexer.Close()
-//		_, err := d.client.Indices.Flush().Index(index).Do(context.Background())
-//		return err
-//	}
-//	return nil
-//}
-
-func (d *Driver) processEvent(event thunder.TargetEvent, bulkIndexer *BulkIndexer, index string, ctx context.Context) error {
+func (d *Driver) processEvent(event thunder.TargetEvent, bulkIndexer *BulkIndexer, index string) error {
 	switch typedEvent := event.(type) {
 	case *thunder.TargetInsertEvent:
-		bulkIndexer.Add(
+		return bulkIndexer.Add(
 			[]byte(`{"index":{"_index":"`+index+`","_id":"`+SanitizeJsonString(typedEvent.Pkey)+`"}}`),
 			typedEvent.Json,
 		)
-		return nil
 	case *thunder.TargetPatchEvent:
 		// Handle base table update
 		if typedEvent.Relation == nil {
-			bulkIndexer.Add(
+			return bulkIndexer.Add(
 				[]byte(`{"update":{"_index":"`+index+`","_id":"`+SanitizeJsonString(typedEvent.Pkey)+`"}}`),
 				bytes.Join([][]byte{[]byte(`{"doc":`), typedEvent.JsonPatch, []byte("}")}, []byte("")),
 			)
-			return nil
 		}
 
 		// Handle relation patch
@@ -179,7 +133,7 @@ func (d *Driver) processEvent(event thunder.TargetEvent, bulkIndexer *BulkIndexe
 			Body:    strings.NewReader(reqBody),
 		}
 
-		res, err := req.Do(ctx, d.client)
+		res, err := req.Do(context.Background(), d.client)
 		if err != nil {
 			return err
 		}
@@ -195,10 +149,9 @@ func (d *Driver) processEvent(event thunder.TargetEvent, bulkIndexer *BulkIndexe
 	case *thunder.TargetDeleteEvent:
 		// Handle base table delete
 		if typedEvent.Relation == nil {
-			bulkIndexer.Add(
+			return bulkIndexer.Add(
 				[]byte(`{"delete":{"_index":"` + index + `","_id":"` + SanitizeJsonString(typedEvent.Pkey) + `"}}`),
 			)
-			return nil
 		}
 
 		// Handle relation delete
@@ -223,7 +176,7 @@ func (d *Driver) processEvent(event thunder.TargetEvent, bulkIndexer *BulkIndexe
 			Body:    strings.NewReader(reqBody),
 		}
 
-		res, err := req.Do(ctx, d.client)
+		res, err := req.Do(context.Background(), d.client)
 		if err != nil {
 			return err
 		}
@@ -266,7 +219,7 @@ func (d *Driver) processEvent(event thunder.TargetEvent, bulkIndexer *BulkIndexe
 			Body:    strings.NewReader(reqBody),
 		}
 
-		res, err := req.Do(ctx, d.client)
+		res, err := req.Do(context.Background(), d.client)
 		if err != nil {
 			return err
 		}

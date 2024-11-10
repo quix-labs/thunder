@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 	"os"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -103,7 +102,7 @@ func (p *Processor) Start() error {
 	for _, target := range p.Targets {
 		go func() {
 			listenChan, stopListening := p.ListenBroadcaster.NewListenChan()
-			if err := target.Driver.HandleEvents(p, listenChan, context.TODO()); err != nil {
+			if err := target.Driver.HandleEvents(p, listenChan); err != nil {
 				stopListening()
 				//				broadcaster.Close() Uncomment to stop emission
 				//TODO error
@@ -131,16 +130,12 @@ func (p *Processor) Stop() error {
 	return nil
 }
 
-func (p *Processor) FullIndex() error {
+func (p *Processor) FullIndex(ctx context.Context) error {
 	if p.Indexing.Load() {
 		return errors.New("processor is already indexing")
 	}
 	p.Indexing.Store(true)
 	defer p.Indexing.Store(false)
-
-	ctx, cancel := context.WithCancelCause(context.Background())
-	defer cancel(nil)
-
 	eg, egCtx := errgroup.WithContext(ctx)
 
 	// Initialize each channel individually
@@ -153,7 +148,7 @@ func (p *Processor) FullIndex() error {
 	for i, target := range p.Targets {
 		targetChan := targetChans[i] // capture channel locally
 		eg.Go(func() error {
-			return target.Driver.HandleEvents(p, targetChan, egCtx)
+			return target.Driver.HandleEvents(p, targetChan)
 		})
 	}
 
@@ -163,8 +158,6 @@ func (p *Processor) FullIndex() error {
 		defer close(inChan)
 		return p.Source.Driver.GetDocumentsForProcessor(p, inChan, egCtx, 0)
 	})
-
-	var docCount atomic.Uint64
 
 	// Start dispatcher
 	eg.Go(func() error {
@@ -178,46 +171,37 @@ func (p *Processor) FullIndex() error {
 			select {
 			case <-egCtx.Done():
 				return egCtx.Err()
-			case <-time.After(time.Second * 10):
-				cancel(context.DeadlineExceeded)
+			case <-time.After(time.Second * 15):
+				return context.DeadlineExceeded
 			case doc, ok := <-inChan:
 				if !ok {
 					return nil
 				}
-				docCount.Add(1)
 
 				// Send event across all channels in parallel
-				var wg sync.WaitGroup
+				var targetsEg, targetEgCtx = errgroup.WithContext(egCtx)
 				for _, targetChan := range targetChans {
-					wg.Add(1)
-					go func(chanToSend chan TargetEvent) {
-						defer wg.Done()
-						chanToSend <- &TargetInsertEvent{
+					chanToSend := targetChan // capture channel locally
+					targetsEg.Go(func() error {
+						select {
+						case <-targetEgCtx.Done():
+							return targetEgCtx.Err()
+						case chanToSend <- &TargetInsertEvent{
 							Pkey: doc.Pkey,
 							Json: doc.Json,
+						}:
+							return nil
 						}
-					}(targetChan)
+					})
 				}
-				wg.Wait()
+				if err := targetsEg.Wait(); err != nil {
+					return err
+				}
 			}
 		}
 	})
 
-	//TODO REMOVE STATS
-	start := time.Now()
 	err := eg.Wait()
-	totalTime := time.Since(start)
-	totalTimeMs := totalTime.Milliseconds()
-	totalSeconds := totalTime.Seconds()
-	docsPerSec := float64(docCount.Load()) / totalSeconds
-	meanDocTimeMs := float64(totalTimeMs) / float64(docCount.Load())
-
-	fmt.Println("Total Time (s):", totalSeconds)
-	fmt.Println("Documents Processed:", docCount.Load())
-	fmt.Println("Documents per second:", docsPerSec)
-	fmt.Println("Mean Time per Document (ms):", meanDocTimeMs)
-	fmt.Println("Total Time (ms):", totalTimeMs)
-
 	if errors.Is(err, context.Canceled) {
 		return context.Cause(egCtx)
 	}
