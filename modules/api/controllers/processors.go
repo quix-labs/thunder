@@ -84,15 +84,14 @@ func testProcessor(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer close(inChan)
 		errChan <- processor.Source.Driver.GetDocumentsForProcessor(processor, inChan, ctx, 1)
-		close(errChan)
 	}()
 
 	select {
 	case <-ctx.Done():
 		helpers.CheckErr(ctx.Err())
-		helpers.WriteJsonError(w, http.StatusInternalServerError, ctx.Err(), "")
 		return
 	case err := <-errChan:
+		close(errChan)
 		helpers.CheckErr(err)
 	case doc, open := <-inChan:
 		if !open {

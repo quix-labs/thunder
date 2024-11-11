@@ -2,7 +2,6 @@ package json
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/quix-labs/thunder"
 	"io"
 )
@@ -43,12 +42,14 @@ func (e *Exporter) WriteDocument(doc *thunder.Document, itemPosition uint64) err
 		}
 	}
 
-	sanitizedPkey, err := json.Marshal(doc.Pkey)
+	bytes, err := json.Marshal(struct {
+		Pkey string          `json:"pkey"`
+		Data json.RawMessage `json:"data"`
+	}{doc.Pkey, doc.Json})
 	if err != nil {
 		return err
 	}
-
-	_, err = e.w.Write([]byte(fmt.Sprintf(`{"pkey":%s,"data":%s}`, sanitizedPkey, doc.Json)))
+	_, err = e.w.Write(bytes)
 	return err
 }
 
