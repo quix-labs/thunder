@@ -1,12 +1,10 @@
 package controllers
 
 import (
-	"errors"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
 	"github.com/quix-labs/thunder/modules/http_server/helpers"
 	"github.com/quix-labs/thunder/utils"
-	"log"
 	"net/http"
 )
 
@@ -20,43 +18,21 @@ func testSourceDriver(w http.ResponseWriter, r *http.Request) {
 		Driver string
 		Config map[string]any
 	}
+	helpers.CheckErr(http_server.DecodeJSONBody(w, r, &p))
 
-	err := http_server.DecodeJSONBody(w, r, &p)
-	if err != nil {
-		var mr *http_server.MalformedRequest
-		if errors.As(err, &mr) {
-			http.Error(w, mr.Msg, mr.Status)
-		} else {
-			log.Print(err.Error())
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		}
-		return
-	}
-	driver, err := thunder.SourceDrivers.Get(p.Driver)
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
-		return
-	}
+	helpers.NextCheckStatus(http.StatusBadRequest)
+	driver := helpers.Must(thunder.SourceDrivers.Get(p.Driver))
 
 	config := driver.Config().Config
-	configInstance, err := utils.ConvertToDynamicConfig(config, p.Config)
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
+	configInstance := helpers.Must(utils.ConvertToDynamicConfig(config, p.Config))
 
 	// TRY TEST
-	driverInstance, err := driver.New(configInstance)
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusUnprocessableEntity, err, "")
-		return
-	}
+	helpers.NextCheckStatus(http.StatusUnprocessableEntity)
+	driverInstance := helpers.Must(driver.New(configInstance))
 
-	message, err := driverInstance.TestConfig()
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusBadRequest, err, message)
-		return
-	}
+	helpers.NextCheckStatus(http.StatusBadRequest)
+	message := helpers.Must(driverInstance.TestConfig())
+
 	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool
 		Message string `json:"message"`
@@ -69,8 +45,6 @@ type DriverDetails struct {
 }
 
 func listSourceDrivers(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	registeredDrivers := thunder.SourceDrivers.All()
 	res := make(map[string]*DriverDetails, len(registeredDrivers))
 

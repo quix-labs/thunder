@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"errors"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
 	"github.com/quix-labs/thunder/modules/http_server/helpers"
@@ -19,43 +18,21 @@ func testTargetDriver(w http.ResponseWriter, r *http.Request) {
 		Driver string
 		Config map[string]any
 	}
+	helpers.CheckErr(http_server.DecodeJSONBody(w, r, &p))
 
-	err := http_server.DecodeJSONBody(w, r, &p)
-	if err != nil {
-		var mr *http_server.MalformedRequest
-		if errors.As(err, &mr) {
-			http.Error(w, mr.Msg, mr.Status)
-		} else {
-			thunder.GetLoggerForModule("thunder.api").Error().Msg(err.Error())
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		}
-		return
-	}
-	driver, err := thunder.TargetDrivers.Get(p.Driver)
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
-		return
-	}
+	helpers.NextCheckStatus(http.StatusBadRequest)
+	driver := helpers.Must(thunder.TargetDrivers.Get(p.Driver))
 
 	driverConfig := driver.Config()
-	configInstance, err := utils.ConvertToDynamicConfig(driverConfig.Config, p.Config)
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
+	configInstance := helpers.Must(utils.ConvertToDynamicConfig(driverConfig.Config, p.Config))
 
 	// TRY TEST
-	driverInstance, err := driver.New(configInstance)
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusUnprocessableEntity, err, "")
-		return
-	}
+	helpers.NextCheckStatus(http.StatusUnprocessableEntity)
+	driverInstance := helpers.Must(driver.New(configInstance))
 
-	message, err := driverInstance.TestConfig()
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusBadRequest, err, message)
-		return
-	}
+	helpers.NextCheckStatus(http.StatusBadRequest)
+	message := helpers.Must(driverInstance.TestConfig())
+
 	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool
 		Message string `json:"message"`

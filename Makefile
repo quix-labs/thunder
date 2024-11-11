@@ -1,14 +1,17 @@
 GO_FLAGS = -ldflags="-s -w"
 BUILD_OUT = ./dist/thunder
 
-.PHONY: all build build-front build-golang compress-binary clean dev
+.PHONY: all build build-front build-golang compress-binary clean dev dev-nodebug
 
-all: build dev
+all: build dev dev-nodebug
 
 build: build-front build-golang compress-binary
 
 dev:
-	cd app && go run -tags debug .
+	cd dev && go run -tags debug .
+
+dev-nodebug:
+	cd dev && go run .
 
 build-front:
 	 cd ./modules/frontend &&  yarn && yarn generate

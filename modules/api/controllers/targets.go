@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"errors"
 	"fmt"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
@@ -27,12 +26,7 @@ func listTargets(w http.ResponseWriter, r *http.Request) {
 	var res []TargetApiDetails
 
 	for _, target := range thunder.Targets.All() {
-		serializeTarget, err := thunder.SerializeTarget(&target)
-		if err != nil {
-			helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
-			return
-		}
-
+		serializeTarget := helpers.Must(thunder.SerializeTarget(&target))
 		res = append(res, TargetApiDetails{
 			ID:      serializeTarget.ID,
 			Driver:  serializeTarget.Driver,
@@ -45,35 +39,14 @@ func listTargets(w http.ResponseWriter, r *http.Request) {
 
 func createTarget(w http.ResponseWriter, r *http.Request) {
 	var p thunder.JsonTarget
-	err := http_server.DecodeJSONBody(w, r, &p)
-	if err != nil {
-		var mr *http_server.MalformedRequest
-		if errors.As(err, &mr) {
-			http.Error(w, mr.Msg, mr.Status)
-		} else {
-			thunder.GetLoggerForModule("thunder.api").Error().Msg(err.Error())
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		}
-		return
-	}
+	helpers.CheckErr(http_server.DecodeJSONBody(w, r, &p))
 
-	target, err := thunder.UnserializeTarget(&p)
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
-		return
-	}
+	helpers.NextCheckStatus(http.StatusBadRequest)
+	target := helpers.Must(thunder.UnserializeTarget(&p))
 
-	err = thunder.Targets.Register("", *target)
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
+	helpers.CheckErr(thunder.Targets.Register("", *target))
+	helpers.CheckErr(thunder.SaveConfig())
 
-	err = thunder.SaveConfig()
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
 	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
@@ -84,57 +57,25 @@ func updateTarget(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	var s thunder.JsonTarget
-	err := http_server.DecodeJSONBody(w, r, &s)
-	if err != nil {
-		var mr *http_server.MalformedRequest
-		if errors.As(err, &mr) {
-			http.Error(w, mr.Msg, mr.Status)
-		} else {
-			thunder.GetLoggerForModule("thunder.api").Error().Msg(err.Error())
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		}
-		return
-	}
+	helpers.CheckErr(http_server.DecodeJSONBody(w, r, &s))
 
-	newTarget, err := thunder.UnserializeTarget(&s)
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
+	newTarget := helpers.Must(thunder.UnserializeTarget(&s))
 
-	if err := thunder.Targets.Update(id, *newTarget); err != nil {
-		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
-
-	if err = thunder.SaveConfig(); err != nil {
-		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
+	helpers.CheckErr(thunder.Targets.Update(id, *newTarget))
+	helpers.CheckErr(thunder.SaveConfig())
 
 	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
-	}{true, fmt.Sprintf("Target %d updated", id)})
+	}{true, fmt.Sprintf("Target %s updated", id)})
 }
 
 func deleteTarget(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-
-	err := thunder.Targets.Delete(id)
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
-
-	err = thunder.SaveConfig()
-	if err != nil {
-		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
-
+	helpers.CheckErr(thunder.Targets.Delete(id))
+	helpers.CheckErr(thunder.SaveConfig())
 	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
-	}{true, fmt.Sprintf(`Target %d deleted!`, id)})
+	}{true, fmt.Sprintf(`Target %s deleted!`, id)})
 }
