@@ -5,6 +5,7 @@ import (
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/api/controllers"
 	"github.com/quix-labs/thunder/modules/http_server"
+	"github.com/quix-labs/thunder/modules/http_server/helpers"
 	"net/http"
 )
 
@@ -26,13 +27,17 @@ func (m *Module) New() thunder.Module {
 }
 
 func (m *Module) HandleRoutes(mux *http.ServeMux) {
-	controllers.SourceRoutes(mux)
-	controllers.SourceDriverRoutes(mux)
-	controllers.ProcessorRoutes(mux)
-	controllers.TargetDriverRoutes(mux)
-	controllers.TargetRoutes(mux)
-	controllers.EventsRoutes(mux)
-	controllers.ExporterRoutes(mux)
+	innerMux := http.NewServeMux()
+
+	controllers.SourceRoutes(innerMux)
+	controllers.SourceDriverRoutes(innerMux)
+	controllers.ProcessorRoutes(innerMux)
+	controllers.TargetDriverRoutes(innerMux)
+	controllers.TargetRoutes(innerMux)
+	controllers.EventsRoutes(innerMux)
+	controllers.ExporterRoutes(innerMux)
+
+	mux.Handle("/go-api/", helpers.ErrorMiddleware(http.StripPrefix("/go-api", innerMux), ModuleID))
 }
 
 func (m *Module) Start() error {

@@ -2,11 +2,12 @@ package controllers
 
 import (
 	"github.com/quix-labs/thunder"
+	"github.com/quix-labs/thunder/modules/http_server/helpers"
 	"net/http"
 )
 
 func ExporterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /go-api/exporters", listExporters)
+	mux.HandleFunc("GET /exporters", listExporters)
 }
 
 func listExporters(w http.ResponseWriter, r *http.Request) {
@@ -15,5 +16,5 @@ func listExporters(w http.ResponseWriter, r *http.Request) {
 	for exporterID, exporter := range exporters {
 		response[exporterID] = exporter.Name()
 	}
-	writeJsonResponse(w, http.StatusOK, response)
+	helpers.WriteJsonResponse(w, http.StatusOK, response)
 }

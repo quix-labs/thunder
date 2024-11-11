@@ -4,13 +4,14 @@ import (
 	"errors"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
+	"github.com/quix-labs/thunder/modules/http_server/helpers"
 	"github.com/quix-labs/thunder/utils"
 	"net/http"
 )
 
 func TargetDriverRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /go-api/target-drivers", listTargetDrivers)
-	mux.HandleFunc("POST /go-api/target-drivers/test", testTargetDriver)
+	mux.HandleFunc("GET /target-drivers", listTargetDrivers)
+	mux.HandleFunc("POST /target-drivers/test", testTargetDriver)
 }
 
 func testTargetDriver(w http.ResponseWriter, r *http.Request) {
@@ -32,30 +33,30 @@ func testTargetDriver(w http.ResponseWriter, r *http.Request) {
 	}
 	driver, err := thunder.TargetDrivers.Get(p.Driver)
 	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
+		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
 	driverConfig := driver.Config()
 	configInstance, err := utils.ConvertToDynamicConfig(driverConfig.Config, p.Config)
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	// TRY TEST
 	driverInstance, err := driver.New(configInstance)
 	if err != nil {
-		writeJsonError(w, http.StatusUnprocessableEntity, err, "")
+		helpers.WriteJsonError(w, http.StatusUnprocessableEntity, err, "")
 		return
 	}
 
 	message, err := driverInstance.TestConfig()
 	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, message)
+		helpers.WriteJsonError(w, http.StatusBadRequest, err, message)
 		return
 	}
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool
 		Message string `json:"message"`
 	}{true, message})
@@ -77,5 +78,5 @@ func listTargetDrivers(w http.ResponseWriter, r *http.Request) {
 			Fields: utils.ParseDynamicConfigFields(&driverConfig.Config),
 		}
 	}
-	writeJsonResponse(w, http.StatusOK, res)
+	helpers.WriteJsonResponse(w, http.StatusOK, res)
 }

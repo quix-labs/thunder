@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
+	"github.com/quix-labs/thunder/modules/http_server/helpers"
 	"net/http"
 )
 
 func SourceRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /go-api/sources", listSources)
-	mux.HandleFunc("POST /go-api/sources", createSource)
-	mux.HandleFunc("PUT /go-api/sources/{id}", updateSource)
-	mux.HandleFunc("DELETE /go-api/sources/{id}", deleteSource)
-	mux.HandleFunc("GET /go-api/sources/{id}/stats", getSourceStats)
+	mux.HandleFunc("GET /sources", listSources)
+	mux.HandleFunc("POST /sources", createSource)
+	mux.HandleFunc("PUT /sources/{id}", updateSource)
+	mux.HandleFunc("DELETE /sources/{id}", deleteSource)
+	mux.HandleFunc("GET /sources/{id}/stats", getSourceStats)
 }
 
 type SourceApiDetails struct {
@@ -30,7 +31,7 @@ func listSources(w http.ResponseWriter, r *http.Request) {
 	for _, source := range sources {
 		serializeSource, err := thunder.SerializeSource(&source)
 		if err != nil {
-			writeJsonError(w, http.StatusInternalServerError, err, "")
+			helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 			return
 		}
 		res = append(res, SourceApiDetails{
@@ -40,7 +41,7 @@ func listSources(w http.ResponseWriter, r *http.Request) {
 			Excerpt: source.Config.Excerpt(),
 		})
 	}
-	writeJsonResponse(w, http.StatusOK, res)
+	helpers.WriteJsonResponse(w, http.StatusOK, res)
 }
 
 func createSource(w http.ResponseWriter, r *http.Request) {
@@ -60,22 +61,22 @@ func createSource(w http.ResponseWriter, r *http.Request) {
 
 	source, err := thunder.UnserializeSource(&p)
 	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
+		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
 	err = thunder.Sources.Register("", *source)
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	err = thunder.SaveConfig()
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, "Source created"})
@@ -99,21 +100,21 @@ func updateSource(w http.ResponseWriter, r *http.Request) {
 
 	newSource, err := thunder.UnserializeSource(&s)
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	if err := thunder.Sources.Update(id, *newSource); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	if err = thunder.SaveConfig(); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, fmt.Sprintf("Source %d updated", id)})
@@ -123,17 +124,17 @@ func deleteSource(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	err := thunder.Sources.Delete(id)
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	err = thunder.SaveConfig()
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, fmt.Sprintf(`Source %d deleted!`, id)})
@@ -144,15 +145,15 @@ func getSourceStats(w http.ResponseWriter, r *http.Request) {
 
 	source, err := thunder.Sources.Get(id)
 	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
+		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
 	stats, err := source.Driver.Stats()
 	if err != nil {
-		writeJsonError(w, http.StatusUnprocessableEntity, err, "")
+		helpers.WriteJsonError(w, http.StatusUnprocessableEntity, err, "")
 		return
 	}
 
-	writeJsonResponse(w, http.StatusOK, stats)
+	helpers.WriteJsonResponse(w, http.StatusOK, stats)
 }

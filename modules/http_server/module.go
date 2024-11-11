@@ -79,10 +79,8 @@ func GetHttpServerAddr() string {
 
 func router() http.Handler {
 	mux := http.NewServeMux()
-
 	for _, handler := range GetHandlers() {
 		handler.HandleRoutes(mux)
 	}
-
 	return mux
 }

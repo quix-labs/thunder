@@ -7,27 +7,28 @@ import (
 	"fmt"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
+	"github.com/quix-labs/thunder/modules/http_server/helpers"
 	"golang.org/x/sync/errgroup"
 	"net/http"
 	"os"
-	"sync/atomic"
+	"strconv"
 	"time"
 )
 
 func ProcessorRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /go-api/processors", listProcessors)
-	mux.HandleFunc("POST /go-api/processors/test", testProcessor)
+	mux.HandleFunc("GET /processors", listProcessors)
+	mux.HandleFunc("POST /processors/test", testProcessor)
 
-	mux.HandleFunc("POST /go-api/processors", createProcessor)
-	mux.HandleFunc("PUT /go-api/processors/{id}", updateProcessor)
-	mux.HandleFunc("DELETE /go-api/processors/{id}", deleteProcessor)
+	mux.HandleFunc("POST /processors", createProcessor)
+	mux.HandleFunc("PUT /processors/{id}", updateProcessor)
+	mux.HandleFunc("DELETE /processors/{id}", deleteProcessor)
 
-	mux.HandleFunc("POST /go-api/processors/index", indexAllProcessor)
-	mux.HandleFunc("POST /go-api/processors/{id}/index", indexProcessor)
-	mux.HandleFunc("POST /go-api/processors/{id}/start", startProcessor)
-	mux.HandleFunc("POST /go-api/processors/{id}/stop", stopProcessor)
+	mux.HandleFunc("POST /processors/index", indexAllProcessor)
+	mux.HandleFunc("POST /processors/{id}/index", indexProcessor)
+	mux.HandleFunc("POST /processors/{id}/start", startProcessor)
+	mux.HandleFunc("POST /processors/{id}/stop", stopProcessor)
 
-	mux.HandleFunc("GET /go-api/processors/{id}/download", downloadProcessor)
+	mux.HandleFunc("GET /processors/{id}/download", downloadProcessor)
 
 }
 
@@ -50,7 +51,7 @@ func listProcessors(w http.ResponseWriter, r *http.Request) {
 	for _, processor := range thunder.Processors.All() {
 		serializedProcessor, err := thunder.SerializeProcessor(processor)
 		if err != nil {
-			writeJsonError(w, http.StatusInternalServerError, err, "")
+			helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 			return
 		}
 		res = append(res, ProcessorApiDetails{
@@ -68,7 +69,7 @@ func listProcessors(w http.ResponseWriter, r *http.Request) {
 			Enabled:     serializedProcessor.Enabled,
 		})
 	}
-	writeJsonResponse(w, http.StatusOK, res)
+	helpers.WriteJsonResponse(w, http.StatusOK, res)
 }
 
 func testProcessor(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +88,7 @@ func testProcessor(w http.ResponseWriter, r *http.Request) {
 
 	processor, err := thunder.UnserializeProcessor(&p)
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
@@ -107,16 +108,16 @@ func testProcessor(w http.ResponseWriter, r *http.Request) {
 
 	select {
 	case <-ctx.Done():
-		writeJsonError(w, http.StatusInternalServerError, ctx.Err(), "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, ctx.Err(), "")
 		return
 	case err := <-errChan:
 		if err != nil {
-			writeJsonError(w, http.StatusInternalServerError, err, "")
+			helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		}
 	case doc, open := <-inChan:
 		if !open {
 			// Channel is closed, return 204 No Content
-			writeJsonResponse(w, http.StatusNoContent, nil)
+			helpers.WriteJsonResponse(w, http.StatusNoContent, nil)
 			return
 		}
 
@@ -145,18 +146,18 @@ func createProcessor(w http.ResponseWriter, r *http.Request) {
 
 	processor, err := thunder.UnserializeProcessor(&p)
 	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
+		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 	if err := thunder.Processors.Register("", processor); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 	if err = thunder.SaveConfig(); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, "Processor created"})
@@ -180,21 +181,21 @@ func updateProcessor(w http.ResponseWriter, r *http.Request) {
 
 	newProcessor, err := thunder.UnserializeProcessor(&s)
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	if err := thunder.Processors.Update(id, newProcessor); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	if err = thunder.SaveConfig(); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, fmt.Sprintf("Processor %s updated", id)})
@@ -203,15 +204,15 @@ func updateProcessor(w http.ResponseWriter, r *http.Request) {
 func deleteProcessor(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := thunder.Processors.Delete(id); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	if err := thunder.SaveConfig(); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, fmt.Sprintf(`Processor %s deleted!`, id)})
@@ -242,11 +243,11 @@ func indexAllProcessor(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := eg.Wait(); err != nil {
-			writeJsonError(w, http.StatusInternalServerError, err, "")
+			helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 			return
 		}
 
-		writeJsonResponse(w, http.StatusOK, struct {
+		helpers.WriteJsonResponse(w, http.StatusOK, struct {
 			Success bool              `json:"success"`
 			Results map[string]string `json:"results"`
 		}{true, groupedErr})
@@ -266,7 +267,7 @@ func indexAllProcessor(w http.ResponseWriter, r *http.Request) {
 		}()
 	}
 
-	writeJsonResponse(w, http.StatusAccepted, struct {
+	helpers.WriteJsonResponse(w, http.StatusAccepted, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, "Indexing claimed"})
@@ -276,7 +277,7 @@ func indexProcessor(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	processor, err := thunder.Processors.Get(id)
 	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
+		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
@@ -284,10 +285,10 @@ func indexProcessor(w http.ResponseWriter, r *http.Request) {
 
 	if sync {
 		if err := processor.FullIndex(r.Context()); err != nil {
-			writeJsonError(w, http.StatusInternalServerError, err, "error during indexing")
+			helpers.WriteJsonError(w, http.StatusInternalServerError, err, "error during indexing")
 			return
 		}
-		writeJsonResponse(w, http.StatusOK, struct {
+		helpers.WriteJsonResponse(w, http.StatusOK, struct {
 			Success bool   `json:"success"`
 			Message string `json:"message"`
 		}{true, "indexing succeed"})
@@ -304,7 +305,7 @@ func indexProcessor(w http.ResponseWriter, r *http.Request) {
 		thunder.GetLoggerForModule("thunder.api").Info().Msgf("Processor %s has finished in the background", id)
 	}()
 
-	writeJsonResponse(w, http.StatusAccepted, struct {
+	helpers.WriteJsonResponse(w, http.StatusAccepted, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, "Indexing claimed"})
@@ -314,7 +315,7 @@ func startProcessor(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	processor, err := thunder.Processors.Get(id)
 	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
+		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
@@ -325,7 +326,7 @@ func startProcessor(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, fmt.Sprintf("Processor %s started", id)})
@@ -335,15 +336,15 @@ func stopProcessor(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	processor, err := thunder.Processors.Get(id)
 	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
+		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
 	if err := processor.Stop(); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 	}
 
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, fmt.Sprintf("Processor %s stopped", id)})
@@ -351,28 +352,13 @@ func stopProcessor(w http.ResponseWriter, r *http.Request) {
 
 func downloadProcessor(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-
-	processor, err := thunder.Processors.Get(id)
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
-		return
-	}
+	processor := helpers.Must(thunder.Processors.Get(id))
 
 	exporter := cmp.Or(r.FormValue("exporter"), "thunder.csv")
-	filename := cmp.Or(r.FormValue("filename"), fmt.Sprintf("processor-%s.%s", id, exporter))
-
-	exporterInstance, err := thunder.Exporters.Get(exporter)
-	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, fmt.Sprintf("invalid exporter: %s", exporter))
-		return
-	}
+	exporterInstance := helpers.Must(thunder.Exporters.Get(exporter))
 
 	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "thunder-")
-	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
+	tmpFile := helpers.Must(os.CreateTemp("", "thunder-"))
 
 	defer func(name string) {
 		if err := os.Remove(name); err != nil {
@@ -381,7 +367,6 @@ func downloadProcessor(w http.ResponseWriter, r *http.Request) {
 		}
 		thunder.GetLoggerForModule("thunder.api").Debug().Msgf("temporary resource %s removed", tmpFile.Name())
 	}(tmpFile.Name())
-
 	defer func(tmpFile *os.File) {
 		if err := tmpFile.Close(); err != nil {
 			thunder.GetLoggerForModule("thunder.api").Error().Msg(err.Error())
@@ -390,68 +375,19 @@ func downloadProcessor(w http.ResponseWriter, r *http.Request) {
 		thunder.GetLoggerForModule("thunder.api").Debug().Msgf("temporary resource %s closed", tmpFile.Name())
 	}(tmpFile)
 
-	// Instantiate transformer writer
-	if err := exporterInstance.Load(tmpFile); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
-		return
+	// Start the streaming process
+	var limit uint64 = 0
+	if r.FormValue("limit") != "" {
+		limit = helpers.Must(strconv.ParseUint(r.FormValue("limit"), 10, 64))
 	}
 
-	// Start indexing
-	eg, egCtx := errgroup.WithContext(r.Context())
-
-	// Start source
-	var inChan = make(chan *thunder.Document)
-	eg.Go(func() error {
-		defer close(inChan)
-		return processor.Source.Driver.GetDocumentsForProcessor(processor, inChan, egCtx, 0)
-	})
-
-	// Start exporter broadcasting
-	eg.Go(func() error {
-		var position atomic.Uint64
-		for {
-			select {
-			case <-egCtx.Done():
-				return egCtx.Err()
-			case <-time.After(time.Second * 10):
-				return context.DeadlineExceeded
-			case doc, open := <-inChan:
-				if !open {
-					if position.Load() >= 1 {
-						return exporterInstance.AfterAll()
-					}
-					return nil
-				}
-				position.Add(1)
-				if position.Load() == 1 {
-					if err := exporterInstance.BeforeAll(); err != nil {
-						return err
-					}
-				}
-
-				if err := exporterInstance.WriteDocument(doc, position.Load()); err != nil {
-					return err
-				}
-			}
-		}
-	})
-
-	err = eg.Wait()
-	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			err = context.Cause(egCtx)
-		}
-		writeJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
+	helpers.CheckErr(processor.StreamDocuments(r.Context(), exporterInstance, tmpFile, limit))
 
 	// Rewind the temporary file to the beginning
-	if _, err := tmpFile.Seek(0, 0); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
-		return
-	}
+	_ = helpers.Must(tmpFile.Seek(0, 0))
 
 	// Stream temporary file
+	filename := cmp.Or(r.FormValue("filename"), fmt.Sprintf("processor-%s.%s", id, exporter))
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	w.Header().Set("Cache-Control", "private")
 	w.Header().Set("Pragma", "private")

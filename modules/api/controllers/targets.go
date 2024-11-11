@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
+	"github.com/quix-labs/thunder/modules/http_server/helpers"
 	"net/http"
 )
 
 func TargetRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /go-api/targets", listTargets)
-	mux.HandleFunc("POST /go-api/targets", createTarget)
-	mux.HandleFunc("PUT /go-api/targets/{id}", updateTarget)
-	mux.HandleFunc("DELETE /go-api/targets/{id}", deleteTarget)
+	mux.HandleFunc("GET /targets", listTargets)
+	mux.HandleFunc("POST /targets", createTarget)
+	mux.HandleFunc("PUT /targets/{id}", updateTarget)
+	mux.HandleFunc("DELETE /targets/{id}", deleteTarget)
 }
 
 type TargetApiDetails struct {
@@ -28,7 +29,7 @@ func listTargets(w http.ResponseWriter, r *http.Request) {
 	for _, target := range thunder.Targets.All() {
 		serializeTarget, err := thunder.SerializeTarget(&target)
 		if err != nil {
-			writeJsonError(w, http.StatusInternalServerError, err, "")
+			helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 			return
 		}
 
@@ -39,7 +40,7 @@ func listTargets(w http.ResponseWriter, r *http.Request) {
 			Excerpt: target.Config.Excerpt(),
 		})
 	}
-	writeJsonResponse(w, http.StatusOK, res)
+	helpers.WriteJsonResponse(w, http.StatusOK, res)
 }
 
 func createTarget(w http.ResponseWriter, r *http.Request) {
@@ -58,22 +59,22 @@ func createTarget(w http.ResponseWriter, r *http.Request) {
 
 	target, err := thunder.UnserializeTarget(&p)
 	if err != nil {
-		writeJsonError(w, http.StatusBadRequest, err, "")
+		helpers.WriteJsonError(w, http.StatusBadRequest, err, "")
 		return
 	}
 
 	err = thunder.Targets.Register("", *target)
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	err = thunder.SaveConfig()
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, "Target created"})
@@ -97,21 +98,21 @@ func updateTarget(w http.ResponseWriter, r *http.Request) {
 
 	newTarget, err := thunder.UnserializeTarget(&s)
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	if err := thunder.Targets.Update(id, *newTarget); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	if err = thunder.SaveConfig(); err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, fmt.Sprintf("Target %d updated", id)})
@@ -122,17 +123,17 @@ func deleteTarget(w http.ResponseWriter, r *http.Request) {
 
 	err := thunder.Targets.Delete(id)
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
 	err = thunder.SaveConfig()
 	if err != nil {
-		writeJsonError(w, http.StatusInternalServerError, err, "")
+		helpers.WriteJsonError(w, http.StatusInternalServerError, err, "")
 		return
 	}
 
-	writeJsonResponse(w, http.StatusOK, struct {
+	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}{true, fmt.Sprintf(`Target %d deleted!`, id)})

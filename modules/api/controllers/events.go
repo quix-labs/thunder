@@ -8,7 +8,7 @@ import (
 )
 
 func EventsRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /go-api/events", events)
+	mux.HandleFunc("GET /events", events)
 }
 
 func events(w http.ResponseWriter, r *http.Request) {
