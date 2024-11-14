@@ -13,7 +13,7 @@ type DriverConfig struct {
 	Password string `required:"true" type:"password"`
 	Database string `required:"true"`
 	Schema   string `default:"public"`
-	SslMode  string `default:"prefer"`
+	SslMode  string `default:"prefer" label:"SSL Mode" help:"Try disabling if you encounter a TLS error." type:"select" options:"disable,allow,prefer,require,verify-ca,verify-full"`
 }
 
 func (cfg DriverConfig) Excerpt() string {

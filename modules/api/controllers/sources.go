@@ -83,7 +83,6 @@ func deleteSource(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	helpers.CheckErr(thunder.Sources.Delete(id))
 	helpers.CheckErr(thunder.SaveConfig())
-	fmt.Println(thunder.Sources.All())
 	helpers.WriteJsonResponse(w, http.StatusOK, struct {
 		Success bool   `json:"success"`
 		Message string `json:"message"`

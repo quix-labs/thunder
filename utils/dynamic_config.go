@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"cmp"
 	"encoding/json"
 	"github.com/creasty/defaults"
 	"reflect"
@@ -18,7 +19,10 @@ type DynamicConfigField struct {
 	Required bool    `json:"required"`
 	Help     *string `json:"help,omitempty"`
 	Min      string  `json:"min,omitempty"`
+	Max      string  `json:"max,omitempty"`
 	Default  *string `json:"default,omitempty"`
+
+	Options []string `json:"options,omitempty"`
 }
 
 func ParseDynamicConfigFields(config *DynamicConfig) DynamicConfigFields {
@@ -34,27 +38,27 @@ func ParseDynamicConfigFields(config *DynamicConfig) DynamicConfigFields {
 	for i := 0; i < configType.NumField(); i++ {
 		field := configType.Field(i)
 
-		label := field.Tag.Get("label")
-		inputType := field.Tag.Get("type")
-		helpTag := field.Tag.Get("help")
-		defaultTag := field.Tag.Get("default")
-		requiredTag := field.Tag.Get("required")
-		minTag := field.Tag.Get("min")
+		label := cmp.Or(field.Tag.Get("label"), field.Name)
+		inputType := cmp.Or(field.Tag.Get("type"), "text")
 
-		if label == "" {
-			label = field.Name
-		}
-		if inputType == "" {
-			inputType = "text"
-		}
+		helpTag := field.Tag.Get("help")
 		var helpText *string = nil
 		if helpTag != "" {
 			helpText = &helpTag
 		}
 
+		defaultTag := field.Tag.Get("default")
 		var defaultValue *string = nil
 		if defaultTag != "" {
 			defaultValue = &defaultTag
+		}
+
+		var options []string
+		if inputType == "select" {
+			optionsTag := cmp.Or(field.Tag.Get("options"), defaultTag)
+			if optionsTag != "" {
+				options = strings.Split(optionsTag, ",")
+			}
 		}
 
 		inputName := field.Name
@@ -64,6 +68,10 @@ func ParseDynamicConfigFields(config *DynamicConfig) DynamicConfigFields {
 			inputName = strings.Split(jsonTag, ",")[0]
 		}
 
+		minTag := field.Tag.Get("min")
+		maxTag := field.Tag.Get("max")
+		requiredTag := field.Tag.Get("required")
+
 		fields = append(fields, DynamicConfigField{
 			Name:     inputName,
 			Label:    label,
@@ -71,6 +79,8 @@ func ParseDynamicConfigFields(config *DynamicConfig) DynamicConfigFields {
 			Help:     helpText,
 			Required: requiredTag == "true",
 			Min:      minTag,
+			Max:      maxTag,
+			Options:  options,
 			Default:  defaultValue,
 		})
 	}

@@ -5,9 +5,11 @@
         :required="field.required"
         :label="field.label"
         :name="`${field.name}`"
-        :help="field.help">
+        :help="field.help"
+    >
 
       <UInput
+          class="w-full"
           autocomplete="off"
           type="number"
           v-if="['number'].includes(field.type)"
@@ -18,10 +20,19 @@
       />
       <UInput
           autocomplete="off"
+          class="w-full"
           :type="field.type"
           v-else-if="['url','text','password'].includes(field.type)"
           v-model="state[field.name]"/>
-      <span v-else>{{ field.type }} not supported!</span>
+
+      <USelect
+          autocomplete="off"
+          class="w-full"
+          v-else-if="field.type==='select'"
+          :items="field.options"
+          v-model="state[field.name]"
+      />
+      <DevOnly v-else>{{ field.type }} not supported!</DevOnly>
     </UFormField>
   </UForm>
 </template>
