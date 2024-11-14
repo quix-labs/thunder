@@ -1,11 +1,14 @@
 package controllers
 
 import (
+	"cmp"
 	"fmt"
 	"github.com/quix-labs/thunder"
 	"github.com/quix-labs/thunder/modules/http_server"
 	"github.com/quix-labs/thunder/modules/http_server/helpers"
+	"maps"
 	"net/http"
+	"slices"
 )
 
 func SourceRoutes(mux *http.ServeMux) {
@@ -24,9 +27,12 @@ type SourceApiDetails struct {
 }
 
 func listSources(w http.ResponseWriter, r *http.Request) {
-	sources := thunder.Sources.All()
-	var res []SourceApiDetails
 
+	sources := slices.SortedFunc(maps.Values(thunder.Sources.All()), func(a thunder.Source, b thunder.Source) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
+
+	var res []SourceApiDetails
 	for _, source := range sources {
 		serializeSource := helpers.Must(thunder.SerializeSource(&source))
 		res = append(res, SourceApiDetails{

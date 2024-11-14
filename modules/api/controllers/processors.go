@@ -8,8 +8,10 @@ import (
 	"github.com/quix-labs/thunder/modules/http_server"
 	"github.com/quix-labs/thunder/modules/http_server/helpers"
 	"golang.org/x/sync/errgroup"
+	"maps"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"time"
 )
@@ -47,7 +49,12 @@ type ProcessorApiDetails struct {
 
 func listProcessors(w http.ResponseWriter, r *http.Request) {
 	var res []ProcessorApiDetails
-	for _, processor := range thunder.Processors.All() {
+
+	processors := slices.SortedFunc(maps.Values(thunder.Processors.All()), func(a *thunder.Processor, b *thunder.Processor) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
+
+	for _, processor := range processors {
 		serializedProcessor := helpers.Must(thunder.SerializeProcessor(processor))
 		res = append(res, ProcessorApiDetails{
 			Indexing:  processor.Indexing.Load(),

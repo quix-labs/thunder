@@ -1,9 +1,7 @@
 package frontend
 
-//go:generate npm install
-//go:generate npm run generate
-//go:generate cp -r build static
-//go:generate rm -rf build
+//go:generate sh -c "cd src && yarn"
+//go:generate sh -c "cd src && NUXT_OUTPUT_DIR=../static yarn generate"
 
 import (
 	"bytes"
