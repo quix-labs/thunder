@@ -31,11 +31,11 @@ jobs:
           cache-dependency-path: docs/yarn.lock
 
       - name: Install dependencies
-        working-directory: /.docs
+        working-directory: docs
         run: yarn install
 
       - name: Build with VitePress
-        working-directory: /.docs
+        working-directory: docs
         run: yarn docs:build
 
       - name: Upload artifact
