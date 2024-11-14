@@ -13,6 +13,7 @@ type DriverConfig struct {
 	Password string `required:"true" type:"password"`
 	Database string `required:"true"`
 	Schema   string `default:"public"`
+	SslMode  string `default:"prefer"`
 }
 
 func (cfg DriverConfig) Excerpt() string {
