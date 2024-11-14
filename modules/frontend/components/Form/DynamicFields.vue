@@ -1,5 +1,5 @@
 <template>
-  <UForm :state :schema ref="formEl" class="space-y-4">
+  <UForm :state :schema :disabled ref="formEl" class="space-y-4">
     <UFormField
         v-for="field in fields"
         :required="field.required"
@@ -32,9 +32,11 @@ const formEl = useTemplateRef("formEl")
 
 interface Props {
   fields?: any[]
+  disabled?: boolean
 }
 
-const {fields = []} = defineProps<Props>()
+const {fields = [], disabled = false} = defineProps<Props>()
+
 
 const state = defineModel<{ [key: string]: any }>('state', {required: true})
 

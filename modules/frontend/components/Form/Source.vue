@@ -4,8 +4,7 @@
       description="Configure data source" v-model:open="open">
 
     <template #body>
-      <UForm class="space-y-4" :state="form" :schema @submit.prevent="submit" ref="formEl" :disabled="mode==='read'"
-             id="sourceForm">
+      <UForm class="space-y-4" :state="form" :schema @submit.prevent="submit" ref="formEl" :disabled="mode==='read'" id="sourceForm">
         <UFormField name="driver" label="Driver" required>
           <FormCardsInput
               :options="Object.entries(sourceDrivers || {}).map(([ID,item])=>({value:ID,item}))"
@@ -31,7 +30,7 @@
           <UCollapsible default-open>
             <USeparator label="Driver Configuration"/>
             <template #content>
-              <LazyFormDynamicFields :state="form.config" :fields="sourceDrivers[form.driver].fields"/>
+              <LazyFormDynamicFields :state="form.config" :disabled="mode==='read'" :fields="sourceDrivers[form.driver].fields"/>
             </template>
           </UCollapsible>
 

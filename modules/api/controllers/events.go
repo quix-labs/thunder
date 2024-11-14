@@ -1,9 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
-	"fmt"
-	"github.com/quix-labs/thunder"
 	"net/http"
 )
 
@@ -20,19 +17,20 @@ func events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	stopListening := thunder.GetEventBroadcaster().OnAll(func(event string, data any) {
-		payload, err := json.Marshal(data)
-		if err != nil {
-			return // TODO ERROR
-		}
-		_, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, payload)
-		if err != nil {
-			return // TODO ERROR
-		}
-		w.(http.Flusher).Flush()
-	})
+	//TODO STREAM EVENTS
+	//stopListening := thunder.GetEventBroadcaster().OnAll(func(event string, data any) {
+	//	payload, err := json.Marshal(data)
+	//	if err != nil {
+	//		return // TODO ERROR
+	//	}
+	//	_, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, payload)
+	//	if err != nil {
+	//		return // TODO ERROR
+	//	}
+	//	w.(http.Flusher).Flush()
+	//})
 
 	<-r.Context().Done()
-	stopListening()
+	//stopListening()
 
 }

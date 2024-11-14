@@ -70,7 +70,7 @@ func (r *Registry[T]) Register(ID string, item T) error {
 }
 
 func (r *Registry[T]) Update(ID string, item T) error {
-	if _, err := r.Get(ID); err == nil {
+	if _, err := r.Get(ID); err != nil {
 		return err
 	}
 	r.mu.Lock()
@@ -80,7 +80,7 @@ func (r *Registry[T]) Update(ID string, item T) error {
 }
 
 func (r *Registry[T]) Delete(ID string) error {
-	if _, err := r.Get(ID); err == nil {
+	if _, err := r.Get(ID); err != nil {
 		return err
 	}
 	r.mu.Lock()

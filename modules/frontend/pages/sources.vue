@@ -23,9 +23,10 @@
 
 
 <script setup lang="ts">
-import {FormSource, UButton} from "#components";
+import {FormSource, UButton, UDropdownMenu} from "#components";
 import KbdButton from "~/components/KbdButton.vue";
-import type { TableColumn } from '@nuxt/ui'
+import type {TableColumn} from '@nuxt/ui'
+import type {Row} from '@tanstack/vue-table'
 
 const {status, data: sources, refresh} = useSources()
 const slideoverOpen = useSlideover()?.isOpen
@@ -48,8 +49,67 @@ const columns: TableColumn<any>[] = [
   },
   {accessorKey: 'excerpt', header: 'Excerpt'},
   {accessorKey: 'driver', header: 'Driver'},
-  {accessorKey: 'actions', header: ''}
+  {accessorKey: 'actions', header: ''},
+  {
+    id: 'actions',
+    cell: ({row}) => {
+      return h(
+          'div',
+          {class: 'text-right'},
+          h(
+              UDropdownMenu,
+              {
+                content: {
+                  align: 'end'
+                },
+                items: getRowActions(row)
+              },
+              () => h(UButton, {
+                icon: 'i-lucide-ellipsis-vertical',
+                color: 'neutral',
+                variant: 'ghost',
+                class: 'ml-auto'
+              })
+          )
+      )
+    }
+  }
 ]
+
+function getRowActions(row: Row<any>) {
+  return [
+    {
+      type: 'label',
+      label: 'Actions'
+    },
+    {
+      label: 'Show',
+      onSelect: () => {
+        openShowForm(row.original.id)
+      }
+    },
+    {
+      label: 'Duplicate',
+      onSelect: () => {
+        openCloneForm(row.original.id)
+      }
+    },
+    {
+      label: 'Edit',
+      onSelect: () => {
+        openEditForm(row.original.id)
+      }
+    },
+
+    {
+      label: 'Delete',
+      onSelect: () => {
+        remove(row.original.id)
+      }
+    },
+  ]
+}
+
 const sorting = ref([{
   id: 'id',
   desc: true
@@ -66,15 +126,15 @@ const rows = computed(() => sources.value?.map(source => ({
 const openCreateForm = () => {
   useSlideover().open(FormSource, {mode: "create", onCreated: () => refresh(), onUpdated: () => refresh()})
 }
-const openShowForm = (id: number) => {
+const openShowForm = (id: string) => {
   const source = sources.value?.find(s => s.id === id)
   useSlideover().open(FormSource, {mode: "read", source, onCreated: () => refresh(), onUpdated: () => refresh()})
 }
-const openEditForm = (id: number) => {
+const openEditForm = (id: string) => {
   const source = sources.value?.find(s => s.id === id)
   useSlideover().open(FormSource, {mode: "edit", source, onCreated: () => refresh(), onUpdated: () => refresh()})
 }
-const openCloneForm = (id: number) => {
+const openCloneForm = (id: string) => {
   const source = sources.value?.find(s => s.id === id)
   useSlideover().open(FormSource, {
     mode: "create",
@@ -84,7 +144,7 @@ const openCloneForm = (id: number) => {
   })
 }
 
-const remove = async (id: number) => {
+const remove = async (id: string) => {
   const {data, error, status} = await useGoFetch(`/sources/${id}`, {method: "DELETE"})
   if (status.value === "error") {
     useToast().add({color: "error", title: "Unable to delete source", description: error.value?.message})

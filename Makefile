@@ -1,11 +1,12 @@
 GO_FLAGS = -ldflags="-s -w"
 BUILD_OUT = ./dist/thunder
+ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-.PHONY: all build build-front build-golang compress-binary clean dev dev-nodebug
+.PHONY: all build build-golang compress-binary clean dev dev-nodebug
 
-all: build dev dev-nodebug
+all: clean build
 
-build: build-front build-golang compress-binary
+build: generate build-golang compress-binary
 
 dev:
 	cd dev && go run -tags debug .
@@ -13,14 +14,14 @@ dev:
 dev-nodebug:
 	cd dev && go run .
 
-build-front:
-	 cd ./modules/frontend &&  yarn && yarn generate
+generate:
+	go generate ./...
 
 build-golang:
 	cd app && CGO_ENABLED=0 go build $(GO_FLAGS) -o "../$(BUILD_OUT)"
 
 compress-binary:
-	upx -9 -k $(BUILD_OUT)
+	upx --best --lzma $(BUILD_OUT)
 
 clean:
-	rm -f $(BUILD_OUT)
+	rm -rf $(BUILD_OUT)

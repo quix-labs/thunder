@@ -4,7 +4,7 @@ go 1.23.0
 
 replace github.com/quix-labs/thunder => ../
 
-require github.com/quix-labs/thunder v0.0.0-20241111175156-f6ce0ec59204
+require github.com/quix-labs/thunder v0.0.0-20241111180710-de1d500df408
 
 require (
 	github.com/creasty/defaults v1.8.0 // indirect

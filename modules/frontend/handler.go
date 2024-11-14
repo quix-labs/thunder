@@ -1,5 +1,10 @@
 package frontend
 
+//go:generate npm install
+//go:generate npm run generate
+//go:generate cp -r build static
+//go:generate rm -rf build
+
 import (
 	"bytes"
 	"embed"
@@ -11,12 +16,12 @@ import (
 	"strings"
 )
 
-//go:embed all:build
+//go:embed all:static
 var StaticFiles embed.FS
 
 func HandleFrontend(mux *http.ServeMux) {
 	// static files
-	staticFS, _ := fs.Sub(StaticFiles, "build")
+	staticFS, _ := fs.Sub(StaticFiles, "static")
 	mux.Handle("/", FileServerWith404(http.FS(staticFS), func(w http.ResponseWriter, r *http.Request) (doDefaultFileServe bool) {
 		if strings.HasPrefix(r.URL.Path, "/go-api/") {
 			return true
