@@ -141,7 +141,7 @@ func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEv
 	// START LISTENING
 	flashClient, _ := flash.NewClient(&flash.ClientConfig{
 		Logger:      thunder.GetLoggerForSourceDriver(DriverID),
-		DatabaseCnx: "postgresql://devuser:devpass@localhost:5432/devdb?sslmode=disable",
+		DatabaseCnx: "postgresql://devuser:devpass@localhost:5432/devdb",
 		//Driver: wal_logical.NewDriver(&wal_logical.DriverConfig{
 		//	PublicationSlotPrefix: publicationSlotPrefix,
 		//	ReplicationSlot:       replicationSlot,
@@ -284,7 +284,7 @@ func (d *Driver) Stop() error {
 }
 
 func (d *Driver) newConn(ctx context.Context) (*pgx.Conn, error) {
-	pgConnConfig, err := pgx.ParseConfig("postgres://u:s@l:5432/d?sslmode=disable") // Keep sslMode to work in scratch docker
+	pgConnConfig, err := pgx.ParseConfig("postgres://u:s@l:5432/d")
 	if err != nil {
 		return nil, err
 	}
