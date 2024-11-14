@@ -20,19 +20,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Go to 'docs' folder
-        run: cd ./docs
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: yarn # or pnpm / yarn
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
+          cache-dependency-path: docs/package-lock.json
+
       - name: Install dependencies
+        working-directory: /.docs
         run: yarn install
+
       - name: Build with VitePress
+        working-directory: /.docs
         run: yarn docs:build
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
