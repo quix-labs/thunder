@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
           cache: yarn # or pnpm / yarn
-          cache-dependency-path: docs/package-lock.json
+          cache-dependency-path: docs/yarn.lock
 
       - name: Install dependencies
         working-directory: /.docs
