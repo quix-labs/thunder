@@ -181,6 +181,9 @@ const claimIndex = (id: number) => {
   })
 }
 const claimStart = (id: number) => {
+  useToast().add({color: "error", title: "Not implemented yet!", description: "Currently working on!"})
+  return
+
   useGoFetch(`/processors/${id}/start`, {method: "POST"}).then(({data, error, status}) => {
     if (status.value === "error") {
       useToast().add({
@@ -195,6 +198,9 @@ const claimStart = (id: number) => {
   })
 }
 const claimStop = (id: number) => {
+  useToast().add({color: "error", title: "Not implemented yet!", description: "Currently working on!"})
+  return
+
   useGoFetch(`/processors/${id}/stop`, {method: "POST"}).then(({data, error, status}) => {
     if (status.value === "error") {
       useToast().add({
