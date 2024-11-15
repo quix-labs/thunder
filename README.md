@@ -25,7 +25,6 @@ Contributions and feedback are welcome!
 - **Scalable**: Designed to handle databases of all sizes, ensuring fast and efficient syncs.
 
 
----
 
 ## 🌐 Visit Our Website
 
@@ -39,7 +38,6 @@ Our detailed documentation is available to help you get started, learn how to co
 
 - [Full Documentation](https://thunder.quix-labs.com/guide)
 
----
 
 ## Contributing
 
