@@ -24,6 +24,23 @@ Contributions and feedback are welcome!
 - **Real-Time Indexing**: Automatically update indexes as soon as your data changes.
 - **Scalable**: Designed to handle databases of all sizes, ensuring fast and efficient syncs.
 
+
+---
+
+## 🌐 Visit Our Website
+
+For more information, updates, and resources, check out the official website:
+
+- [Thunder Official Website](https://thunder.quix-labs.com)
+
+## 📚 Documentation
+
+Our detailed documentation is available to help you get started, learn how to configure and use Thunder, and explore advanced features:
+
+- [Full Documentation](https://thunder.quix-labs.com/guide)
+
+---
+
 ## Contributing
 
 1. Fork the repository.
@@ -40,8 +57,3 @@ Contributions and feedback are welcome!
 ## License
 
 MIT. See the [License File](LICENSE.md) for more information.
-
-## Useful Links
-
-- [Website](https://thunder.quix-labs.com)
-- [Documentation](https://thunder.quix-labs.com/guide)
