@@ -1,6 +1,5 @@
 GO_FLAGS = -ldflags="-s -w"
 BUILD_OUT = ./dist/thunder
-ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
 .PHONY: all build build-golang compress-binary clean dev dev-nodebug
 

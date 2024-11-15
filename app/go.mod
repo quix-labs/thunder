@@ -1,6 +1,6 @@
 module github.com/quix-labs/thunder/app
 
-go 1.23.0
+go 1.23.3
 
 replace github.com/quix-labs/thunder => ../
 
@@ -10,7 +10,7 @@ require (
 	github.com/creasty/defaults v1.8.0 // indirect
 	github.com/doug-martin/goqu/v9 v9.19.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.6.0 // indirect
-	github.com/elastic/go-elasticsearch/v8 v8.15.0 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.16.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

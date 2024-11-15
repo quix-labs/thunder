@@ -1,11 +1,11 @@
 module github.com/quix-labs/thunder
 
-go 1.23.0
+go 1.23.3
 
 require (
 	github.com/creasty/defaults v1.8.0
 	github.com/doug-martin/goqu/v9 v9.19.0
-	github.com/elastic/go-elasticsearch/v8 v8.15.0
+	github.com/elastic/go-elasticsearch/v8 v8.16.0
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/quix-labs/flash v0.0.0-20240715105610-d3fe20e10139
