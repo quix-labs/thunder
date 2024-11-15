@@ -13,7 +13,7 @@ export default defineConfig({
     },
 
     themeConfig: {
-        outline: [2, 3, 4],
+        outline: [2, 3],
         logo: '/logo.svg',
         siteTitle: "Thunder",
         nav: [
@@ -62,9 +62,9 @@ function sidebarGuide(): DefaultTheme.SidebarItem[] {
             collapsed: false,
             items: [
                 {text: 'Sources', link: 'sources'},
+                {text: 'Targets', link: 'targets'},
                 {text: 'Processors', link: 'processors'},
                 {text: 'Exporters', link: 'exporters'},
-                {text: 'Targets', link: 'targets'},
             ]
         },
         {
@@ -73,7 +73,17 @@ function sidebarGuide(): DefaultTheme.SidebarItem[] {
             base: '/guide/modules/',
             items: [
                 {text: 'HTTP Server', link: 'http-server'},
-                {text: 'API', link: 'api'},
+                {
+                    text: 'API',
+                    collapsed: false,
+                    base: '/guide/modules/api/',
+                    link: '',
+                    items: [
+                        {text: 'Sources', link: 'sources'},
+                        {text: 'Targets', link: 'targets'},
+                        {text: 'Processors', link: 'processors'},
+                    ]
+                },
                 {text: 'Frontend', link: 'frontend'},
             ]
         },
