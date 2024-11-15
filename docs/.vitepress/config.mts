@@ -8,6 +8,20 @@ export default defineConfig({
     lastUpdated: false,
     cleanUrls: true,
 
+    head: [
+        ['link', {rel: 'icon', type: 'image/svg+xml', href: '/logo.svg'}],
+        ['link', {rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png'}],
+        ['link', {rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16x16.png'}],
+        ['link', {rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png'}],
+        ['meta', {name: 'theme-color', content: '#5f67ee'}],
+        ['meta', {property: 'og:type', content: 'website'}],
+        ['meta', {property: 'og:locale', content: 'en'}],
+        ['meta', {property: 'og:title', content: 'Thunder | Sync your database with search indexes'}],
+        ['meta', {property: 'og:site_name', content: 'Thunder'}],
+        ['meta', {property: 'og:image', content: 'https://thunder.quix-labs.com/thunder-og.jpg'}],
+        ['meta', {property: 'og:url', content: 'https://thunder.quix-labs.com'}],
+    ],
+
     sitemap: {
         hostname: 'https://thunder.quix-labs.com'
     },
