@@ -6,7 +6,7 @@ ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
 all: clean build
 
-build: generate build-golang compress-binary
+build: build-golang compress-binary
 
 dev:
 	cd dev && go run -tags debug .
