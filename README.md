@@ -1,11 +1,12 @@
 # Thunder
 
-![Container Registry](https://img.shields.io/github/release/quix-labs/thunder?label=Latest%20Version&sort=semver)  
-![Static Assets](https://img.shields.io/github/actions/workflow/status/quix-labs/thunder/goreleaser.yml?label=Static%20Assets)  
-![Static Assets](https://img.shields.io/github/actions/workflow/status/quix-labs/thunder/deploy_docs.yml?label=Documentation)  
-![License](https://img.shields.io/github/license/quix-labs/thunder?color=blue)
+[![Container Registry](https://img.shields.io/github/release/quix-labs/thunder?label=Latest%20Version&sort=semver)](https://github.com/quix-labs/thunder/releases/latest)
+[![Static Assets](https://img.shields.io/github/actions/workflow/status/quix-labs/thunder/goreleaser.yml?label=Static%20Assets)](https://github.com/quix-labs/thunder/actions/workflows/goreleaser.yml)
+[![Documentation](https://img.shields.io/github/actions/workflow/status/quix-labs/thunder/deploy_docs.yml?label=Documentation)](https://thunder.quix-labs.com/guide)
+[![License](https://img.shields.io/github/license/quix-labs/thunder?color=blue)](https://github.com/quix-labs/thunder/blob/main/LICENSE.md)
 
-**Thunder** is a lightweight tool designed to easily synchronize your SQL databases (Postgres, MySQL, etc.) with search engines (ElasticSearch, OpenSearch, etc.) without impacting your database's performance.
+**Thunder** is a lightweight tool designed to easily synchronize your SQL databases (Postgres, MySQL, etc.) with search
+engines (ElasticSearch, OpenSearch, etc.) without impacting your database's performance.
 
 It is optimized for real-time updates, ensuring that your data is always indexed and searchable.
 
