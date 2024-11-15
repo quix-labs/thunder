@@ -169,5 +169,3 @@ Go to `/targets` to configure them
 ## License
 
 The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
-
-

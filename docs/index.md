@@ -1,25 +1,32 @@
 ---
-# https://vitepress.dev/reference/default-theme-home-page
 layout: home
 
 hero:
-  name: "Thunder / Quix-Labs"
-  text: "Fast, efficient, and optimized synchronization between SQL databases and indexers."
-  tagline: My great project tagline
+  name: "Thunder"
+  text: "Sync your database with search indexes"
+  tagline: "Real-time, scalable, and fast."
+  image:
+    src: /logo.svg
+    alt: Logo Thunder
   actions:
     - theme: brand
-      text: Markdown Examples
-      link: /markdown-examples
+      text: Get Started
+      link: /guide/what-is-thunder
     - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: GitHub
+      link: https://github.com/quix-labs/thunder
 
 features:
-  - title: Feature A
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature B
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature C
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+  - title: Real-Time Indexing
+    icon: ⏱️
+    details: Automatically update indexes in near real-time whenever your data changes.
+  - title: Non-Intrusive Synchronization
+    icon: 🕊️
+    details: Sync your SQL data without any performance hit to your database.
+  - title: Scalable
+    icon: 🛠️
+    details: Handle databases of all sizes, ensuring quick and efficient synchronization.
+  - title: Open Source
+    icon: 💻
+    details: Thunder is open-source and welcomes contributions from the community.
 ---
-

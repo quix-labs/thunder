@@ -1,0 +1,4 @@
+:root {
+    --vp-home-hero-image-background-image: url('/logo.svg');
+    --vp-home-hero-image-filter: blur(52px) opacity(0.6);
+}
