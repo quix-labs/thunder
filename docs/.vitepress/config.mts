@@ -60,7 +60,7 @@ export default defineConfig({
 
         footer: {
             message: 'Released under the <a href="https://github.com/quix-labs/thunder/blob/main/LICENSE.md">MIT License</a>.',
-            copyright: `Copyright © ${new Date().getFullYear()} - <a href="https://github.com/quix-labs">Quix Labs</a>`
+            copyright: `Copyright © ${new Date().getFullYear()} - <a href="https://www.quix-labs.com">Quix Labs</a>`
         }
     }
 })
