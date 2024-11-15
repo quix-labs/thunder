@@ -5,10 +5,8 @@ export default defineConfig({
     lang: 'en-US',
     description: "Fast, efficient, and optimized synchronization between SQL databases and indexers.",
 
-    lastUpdated: true,
+    lastUpdated: false,
     cleanUrls: true,
-    metaChunk: true,
-    mpa: true,
 
     sitemap: {
         hostname: 'https://thunder.quix-labs.com'
