@@ -18,7 +18,10 @@ export default defineConfig({
         ['meta', {property: 'og:locale', content: 'en'}],
         ['meta', {property: 'og:title', content: 'Thunder | Sync your database with search indexes'}],
         ['meta', {property: 'og:site_name', content: 'Thunder'}],
-        ['meta', {property: 'og:image', content: 'https://thunder.quix-labs.com/thunder-og.jpg'}],
+        ['meta', {property: 'og:image', content: 'https://thunder.quix-labs.com/thunder-og.png'}],
+        ['meta', {property: 'og:image:type', content: 'image/png'}],
+        ['meta', {property: 'og:image:width', content: '1280'}],
+        ['meta', {property: 'og:image:height', content: '640'}],
         ['meta', {property: 'og:url', content: 'https://thunder.quix-labs.com'}],
     ],
 
