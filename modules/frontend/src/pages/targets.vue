@@ -71,7 +71,7 @@ const openCloneForm = (id: number) => {
   const target = targets.value?.find(s => s.id === id)
   useSlideover().open(FormTarget, {
     mode: "create",
-    target: {...toRaw(target)},
+    target: reactive({...JSON.parse(JSON.stringify(target))}),
     onCreated: () => refresh(),
     onUpdated: () => refresh()
   })

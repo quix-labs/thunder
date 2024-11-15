@@ -73,9 +73,10 @@ const openEditForm = (id: string) => {
 }
 const openCloneForm = (id: string) => {
   const source = sources.value?.find(s => s.id === id)
+
   useSlideover().open(FormSource, {
     mode: "create",
-    source: {...toRaw(source)},
+    source: reactive({...JSON.parse(JSON.stringify(source))}),
     onCreated: () => refresh(),
     onUpdated: () => refresh()
   })

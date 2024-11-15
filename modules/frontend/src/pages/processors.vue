@@ -143,9 +143,10 @@ const openEditForm = (id: number) => {
 
 const openCloneForm = (id: number) => {
   const processor = processors.value?.find(s => s.id === id)
+
   useSlideover().open(ProcessorFormComplete, {
     mode: "create",
-    processor: {...toRaw(processor)},
+    processor: reactive({...JSON.parse(JSON.stringify(processor))}),
     onCreated: () => refresh(),
     onUpdated: () => refresh()
   })
