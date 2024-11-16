@@ -8,6 +8,10 @@ export default defineConfig({
     lastUpdated: false,
     cleanUrls: true,
 
+    srcExclude: [
+        'README.md'
+    ],
+
     head: [
         ['link', {rel: 'icon', type: 'image/svg+xml', href: '/logo.svg'}],
         ['link', {rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png'}],
