@@ -25,7 +25,6 @@ Contributions and feedback are welcome!
 - **Scalable**: Designed to handle databases of all sizes, ensuring fast and efficient syncs.
 
 
-
 ## 🌐 Visit Our Website
 
 For more information, updates, and resources, check out the official website:
