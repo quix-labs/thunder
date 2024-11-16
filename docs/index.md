@@ -30,3 +30,12 @@ features:
     icon: 💻
     details: Thunder is open-source and welcomes contributions from the community.
 ---
+
+:::tip Notes
+
+**This library is currently under active development.**
+
+Features and APIs may change.
+
+Contributions and feedback are welcome!
+:::
