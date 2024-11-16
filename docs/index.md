@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: "Thunder"
-  text: "Sync your database with search indexes"
+  text: "Sync your database with Elasticsearch"
   tagline: "Real-time, scalable, and fast."
   image:
     src: /logo.svg
