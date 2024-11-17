@@ -7,7 +7,7 @@
         <KbdButton :kbds="['r']" label="Refresh" color="info" variant="soft" icon="i-heroicons-arrow-path-20-solid"
                    @click="()=>refresh()" :loading="status==='pending' || status==='idle'"/>
         <KbdButton :kbds="['c']" label="Create" variant="soft" leading-icon="i-heroicons-plus" :disabled="slideoverOpen"
-                   @click="()=>openCreateForm()"/>
+                   to="/processors/create"/>
       </div>
     </template>
 
@@ -45,7 +45,7 @@
       <template #cell-actions="{ row }">
         <div class="flex gap-2 justify-end">
           <UDropdownMenu :items="[[
-                  {label:'Replicate',onSelect:()=>openCloneForm(row.id)},
+                  {label:'Replicate',to:`/processors/create?from=${row.id}`},
                   {label:'Claim indexing',onSelect:()=>claimIndex(row.id),disabled:row.indexing},
                   {label:'Start listening',onSelect:()=>claimStart(row.id),disabled:row.listening},
                   {label:'Stop listening',onSelect:()=>claimStop(row.id),disabled:!row.listening},
@@ -54,9 +54,10 @@
           </UDropdownMenu>
 
           <UButton icon="i-heroicons-eye" variant="link" color="neutral" class="p-0" size="xl"
-                   @click.stop.prevent="openShowForm(row.id)"/>
+                   :to="`/processors/${row.id}`"/>
           <UButton icon="i-heroicons-pencil-square" variant="link" color="neutral" class="p-0" size="xl"
-                   @click.stop.prevent="openEditForm(row.id)"/>
+                   :to="`/processors/${row.id}/edit`"/>
+
           <UButton icon="i-heroicons-document-arrow-down" variant="link" color="primary" class="p-0" size="xl"
                    @click.stop.prevent="openDownloadForm(row.id)"/>
           <UButton icon="i-heroicons-trash" variant="link" color="error" class="p-0" size="xl"
@@ -72,8 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import KbdButton from "../components/KbdButton.vue";
-import {LazyDownloadProcessorForm, ProcessorFormComplete, UButton, UDropdownMenu} from "#components";
+import {LazyDownloadProcessorForm, UButton, UDropdownMenu} from "#components";
 
 const {status, data: processors, refresh} = useProcessors()
 const slideoverOpen = useSlideover()?.isOpen
@@ -118,40 +118,6 @@ const getMappingStats = (mapping: any[]) => {
 }
 
 // Form
-
-const openCreateForm = () => {
-  useSlideover().open(ProcessorFormComplete, {mode: "create", onCreated: () => refresh(), onUpdated: () => refresh()})
-}
-const openShowForm = (id: number) => {
-  const processor = processors.value?.find(s => s.id === id)
-  useSlideover().open(ProcessorFormComplete, {
-    mode: "read",
-    processor,
-    onCreated: () => refresh(),
-    onUpdated: () => refresh()
-  })
-}
-const openEditForm = (id: number) => {
-  const processor = processors.value?.find(s => s.id === id)
-  useSlideover().open(ProcessorFormComplete, {
-    mode: "edit",
-    processor,
-    onCreated: () => refresh(),
-    onUpdated: () => refresh()
-  })
-}
-
-const openCloneForm = (id: number) => {
-  const processor = processors.value?.find(s => s.id === id)
-
-  useSlideover().open(ProcessorFormComplete, {
-    mode: "create",
-    processor: reactive({...JSON.parse(JSON.stringify(processor))}),
-    onCreated: () => refresh(),
-    onUpdated: () => refresh()
-  })
-}
-
 const openDownloadForm = (id: number) => {
   useModal().open(LazyDownloadProcessorForm, {processorId: id})
 }
@@ -163,6 +129,7 @@ const remove = async (id: number) => {
   } else if (status.value === "success") {
     const serverData = data.value as { message?: string }
     useToast().add({color: "success", title: "Successfully deleted processor", description: serverData.message})
+    await refresh()
   }
 }
 
@@ -177,6 +144,7 @@ const claimIndex = (id: number) => {
     } else if (status.value === "success") {
       const serverData = data.value as { message?: string }
       useToast().add({color: "success", title: "Successfully indexed", description: serverData.message})
+      refresh()
     }
   })
 }
@@ -194,6 +162,7 @@ const claimStart = (id: number) => {
     } else if (status.value === "success") {
       const serverData = data.value as { message?: string }
       useToast().add({color: "success", title: "Successfully started", description: serverData.message})
+      refresh()
     }
   })
 }

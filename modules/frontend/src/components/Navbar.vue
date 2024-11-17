@@ -1,21 +1,17 @@
 <template>
   <UNavigationMenu color="primary" variant="pill" :items="items">
     <template #item-trailing="{item}">
-      <UButtonGroup><UKbd v-for="key in item.shortcuts||[]" :value="key"/></UButtonGroup>
+      <UButtonGroup>
+        <UKbd v-for="key in item.shortcuts||[]" :value="key"/>
+      </UButtonGroup>
     </template>
   </UNavigationMenu>
-  <USelect
-      :key="useId()"
-      class="w-[10em]"
-      v-model="$colorMode.preference"
-      :items="colorModeItems"
-      :icon="colorModeItems?.find(i=>i.value===$colorMode.preference)?.icon"
-  />
+
 </template>
 <script setup lang="ts">
 import type {ShortcutsConfig} from "#ui/composables/defineShortcuts";
 
-const items = ref([
+const items = computed(() => [
   [
     {
       label: 'Dashboard',
@@ -35,7 +31,8 @@ const items = ref([
       label: 'Processors',
       icon: 'i-heroicons-briefcase',
       to: '/processors',
-      shortcuts: ['alt', 'p']
+      shortcuts: ['alt', 'p'],
+      active: useRoute().path.startsWith('/processors'),
     },
     {
       label: 'Targets',

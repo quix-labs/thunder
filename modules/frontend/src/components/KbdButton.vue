@@ -25,6 +25,7 @@ defineOptions({
 interface Props {
   kbds?: string[],
   onClick?: () => void
+  to?: string
 }
 
 const props = defineProps<Props>()
@@ -33,14 +34,17 @@ const handleClick = () => {
   if (props.onClick) {
     props.onClick()
   }
+  if (props.to) {
+    navigateTo(props.to)
+  }
 }
 
 const shortcuts = computed(() => {
-  if (!props.kbds?.length || !props.onClick) {
+  if (!props.kbds?.length || !(props.onClick || props.to)) {
     return {}
   }
   return {
-    [props.kbds.join('_')]: () => props.onClick?.()
+    [props.kbds.join('_')]: () => handleClick()
   }
 })
 

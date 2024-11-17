@@ -40,7 +40,9 @@ func HandleFrontend(mux *http.ServeMux) {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(404)
+
+		// CANNOT RETURN 404 due to SPA
+		//w.WriteHeader(404)
 
 		http.ServeContent(w, r, fileInfo.Name(), fileInfo.ModTime(), bytes.NewReader(content))
 		return
