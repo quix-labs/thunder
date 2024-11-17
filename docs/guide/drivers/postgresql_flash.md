@@ -1,6 +1,12 @@
 # PostgreSQL Flash Driver
 
-## Realtime compatibility Table
+:::info
+Real-time capabilities are currently under development.  
+You can still use the driver for bulk indexing or to generate structured documents via the [Exporters](../exporters).
+:::
+
+
+## Real-time Compatibility Table (Work in Progress, Currently Unavailable)
 
 |      Target      | Insert | Insert rel_col | Update | Update rel_col | Delete | Delete rel col | Truncate |
 |:----------------:|:------:|:--------------:|:------:|:--------------:|:------:|:--------------:|:--------:|

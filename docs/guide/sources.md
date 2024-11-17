@@ -11,7 +11,7 @@ Each source is tightly coupled with a **driver** that determines the mechanism f
 
 A driver is the core component responsible for connecting to and extracting data from the source.
 
-By default, the application includes the [`thunder.postgresql_flash`](./drivers/postgresql_flash) driver.
+By default, the application includes the [PostgreSQL Driver](./drivers/postgresql_flash) and [MySQL/MariaDB](./drivers/mysql) driver.
 
 However, developers have the ability to create custom drivers tailored to specific needs.
 

@@ -20,7 +20,7 @@ You have several options for installing **Thunder**:
 
 3. Access the tool at `http://localhost:3000` and configure it via the web interface.
 
-:::tip NOTE
+:::info Suggestion
 It is recommended to specify a tag (version) when pulling the Docker image, for example:
 
 ```bash

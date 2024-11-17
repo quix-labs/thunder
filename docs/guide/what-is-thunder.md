@@ -19,6 +19,7 @@ Thunder is ideal for scenarios where you need to sync structured data from your 
 - **Analytics & BI**: Sync large data sets for real-time reporting and analysis.
 - **CRM**: Index customer data for improved search performance.
 
+
 ## Key Features
 
 - **Real-Time Sync**
@@ -51,15 +52,24 @@ Thunder is ideal for scenarios where you need to sync structured data from your 
 
 ## Supported Databases and Search Engines
 
+:::warning Important Notes
+
+Real-time listening is currently only planned for the [PostgreSQL Driver](./drivers/postgresql_flash).  
+For details on why it is not implemented for MySQL, refer to the [MySQL Driver](./drivers/mysql) page.
+
+:::
+
+
 Thunder currently supports:
 
 - **Databases**:
-    - PostgreSQL
-    - ~~MySQL~~ (Coming soon)
+  - PostgreSQL
+  - MySQL/MariaDB (Partial, no real-time capabilities)
 
 - **Search Engines**:
-    - ElasticSearch
-    - ~~OpenSearch~~ (Coming soon)
+  - ElasticSearch
+  - ~~OpenSearch~~ (Coming soon)
+
 
 ## Interested?
 

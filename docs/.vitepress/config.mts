@@ -111,5 +111,15 @@ function sidebarGuide(): DefaultTheme.SidebarItem[] {
                 {text: 'Frontend', link: 'frontend'},
             ]
         },
+        {
+            text: 'Source Drivers',
+            collapsed: false,
+            base: '/guide/drivers/',
+            items: [
+                {text: 'PostgreSQL Flash', link: 'postgresql_flash'},
+                {text: 'MySQL/MariaDB', link: 'mysql'},
+            ]
+        },
+
     ]
 }
