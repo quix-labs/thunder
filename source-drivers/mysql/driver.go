@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -64,7 +63,7 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 	}
 
 	query := StatsQuery(d.config.Database)
-	rows, err := conn.QueryContext(context.Background(), query)
+	rows, err := conn.QueryxContext(context.Background(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -74,8 +73,8 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 		Columns     string `db:"columns"`
 		PrimaryKeys string `db:"primary_keys"`
 	}
-	var results []*RowResult
 
+	var results []*RowResult
 	err = sqlx.StructScan(rows, &results)
 	if err != nil {
 		return nil, err
@@ -108,22 +107,20 @@ func (d *Driver) GetDocumentsForProcessor(processor *thunder.Processor, in chan<
 		return err
 	}
 
-	rows, err := conn.QueryContext(context.Background(), query)
+	rows, err := conn.QueryxContext(ctx, query)
 	if err != nil {
 		return err
 	}
 
-	var results []*thunder.Document
-	err = sqlx.StructScan(rows, &results)
-	if err != nil {
-		return err
+	for rows.Next() {
+		var rowResult = thunder.Document{}
+		if err = rows.StructScan(&rowResult); err != nil {
+			break
+		}
+		in <- &rowResult
 	}
 
-	for _, result := range results {
-		in <- result
-	}
-
-	return conn.Close()
+	return errors.Join(err, rows.Close(), conn.Close())
 }
 
 func (d *Driver) Start(p *thunder.Processor, in utils.BroadcasterIn[thunder.DbEvent]) error {
@@ -134,7 +131,7 @@ func (d *Driver) Stop() error {
 	return errors.New("not implemented")
 }
 
-func (d *Driver) newConn(ctx context.Context) (*sql.Conn, error) {
+func (d *Driver) newConn(ctx context.Context) (*sqlx.Conn, error) {
 
 	cfg := mysql.Config{
 		User:   d.config.User,
@@ -144,12 +141,12 @@ func (d *Driver) newConn(ctx context.Context) (*sql.Conn, error) {
 		DBName: d.config.Database,
 	}
 
-	db, err := sql.Open("mysql", cfg.FormatDSN())
+	db, err := sqlx.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		return nil, err
 	}
 
-	return db.Conn(ctx)
+	return db.Connx(ctx)
 }
 
 var (
