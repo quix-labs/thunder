@@ -64,7 +64,6 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 	}
 
 	query := StatsQuery(d.config.Schema)
-	stats := thunder.SourceDriverStats{}
 	type RowResult struct {
 		Name        string   `json:"name"`
 		Columns     []string `json:"columns"`
@@ -77,6 +76,8 @@ func (d *Driver) Stats() (*thunder.SourceDriverStats, error) {
 	if err != nil {
 		return nil, errors.Join(err, closeErr)
 	}
+
+	stats := thunder.SourceDriverStats{}
 	for _, result := range results {
 		stats[result.Name] = thunder.SourceDriverStatsTable{
 			Columns:     result.Columns,

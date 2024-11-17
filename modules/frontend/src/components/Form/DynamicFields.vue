@@ -1,6 +1,5 @@
 <template>
   <UForm :state :schema :disabled ref="formEl" class="space-y-4">
-    {{state}}
     <UFormField
         v-for="field in fields"
         :required="field.required"

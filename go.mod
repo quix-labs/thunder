@@ -6,7 +6,9 @@ require (
 	github.com/creasty/defaults v1.8.0
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/elastic/go-elasticsearch/v8 v8.16.0
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/jackc/pgx/v5 v5.7.1
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/quix-labs/flash v0.0.0-20240715105610-d3fe20e10139
 	github.com/quix-labs/flash/drivers/trigger v0.0.0-20240715105610-d3fe20e10139
@@ -16,6 +18,7 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.6.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

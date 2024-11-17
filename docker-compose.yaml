@@ -17,6 +17,19 @@ services:
       - "-c"
       - "wal_level=logical"
 
+  mysql:
+    image: mysql:latest
+    container_name: mysql
+    environment:
+      MYSQL_USER: devuser
+      MYSQL_ROOT_PASSWORD: devpass
+      MYSQL_PASSWORD: devpass
+      MYSQL_DATABASE: devdb
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin
@@ -56,3 +69,4 @@ services:
 
 volumes:
   postgres-data:
+  mysql-data:

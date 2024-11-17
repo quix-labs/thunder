@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/doug-martin/goqu/v9"
+	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/jackc/pgx/v5"
 	"github.com/quix-labs/thunder"
@@ -21,12 +22,14 @@ type join struct {
 }
 type joins []join
 
+var dialect = "postgres"
+
 func generateAlias() string {
 	rand.Seed(time.Now().UnixNano())
 	return "t" + strconv.Itoa(rand.Intn(10000)) // Exemple : t1234
 }
 func GetSqlForProcessor(processor *thunder.Processor) (string, error) {
-	query := goqu.Dialect("postgres").From(goqu.T(processor.Table))
+	query := goqu.Dialect(dialect).From(goqu.T(processor.Table))
 
 	var mappingJoins joins
 	resultExpr, err := processMapping(processor.Table, &processor.Mapping, &mappingJoins, false, processor.PrimaryKeys)
@@ -74,7 +77,7 @@ func GetSqlForProcessor(processor *thunder.Processor) (string, error) {
 		bindings = append(bindings, "?")
 	}
 	query = query.SelectAppend(
-		goqu.L("?::TEXT", goqu.Func("to_json", goqu.L(fmt.Sprintf("ARRAY[%s]::text[]", strings.Join(bindings, ",")), args...))).As("Pkey"),
+		goqu.Cast(goqu.Func("to_json", goqu.L(fmt.Sprintf("ARRAY[%s]::text[]", strings.Join(bindings, ",")), args...)), "TEXT").As("Pkey"),
 		goqu.Func("txid_current").As("Version"),
 	)
 
@@ -105,7 +108,7 @@ func processMapping(tableAlias string, mapping *thunder.Mapping, mappingJoins *j
 				return nil, err
 			}
 
-			query := goqu.From(goqu.T(relation.Table)).Select(relationExpr.As("result"))
+			query := goqu.Dialect(dialect).From(goqu.T(relation.Table)).Select(relationExpr.As("result"))
 
 			for _, join := range relationJoins {
 				query = query.LeftOuterJoin(join.Table, join.On)
@@ -150,18 +153,20 @@ func processMapping(tableAlias string, mapping *thunder.Mapping, mappingJoins *j
 	}
 	jsonSubSelects = append(jsonSubSelects,
 		goqu.V("_pkey"),
-		goqu.L("?::TEXT", goqu.Func("to_json", goqu.L(fmt.Sprintf("ARRAY[%s]::text[]", strings.Join(bindings, ",")), args...))))
+		goqu.Cast(goqu.Func("to_json", goqu.Func("to_json", goqu.L(fmt.Sprintf("ARRAY[%s]::text[]", strings.Join(bindings, ",")), args...))), "TEXT"),
+	)
+
+	// Prevent ERROR: cannot pass more than 100 arguments to a function (SQLSTATE 54023) using chunk
+	const chunkSize = 100
 
 	// Convert this to json
-	if len(jsonSubSelects) <= 100 {
+	if len(jsonSubSelects) <= chunkSize {
 		if aggregate {
-			return goqu.Func("json_agg", goqu.Func("json_build_object", jsonSubSelects...)), nil
+			return goqu.Func("JSON_ARRAYAGG", goqu.Func("json_build_object", jsonSubSelects...)), nil
 		}
 		return goqu.Func("json_build_object", jsonSubSelects...), nil
 	}
 
-	// Prevent ERROR: cannot pass more than 100 arguments to a function (SQLSTATE 54023) using chunk
-	const chunkSize = 100
 	var chunks []exp.SQLFunctionExpression
 
 	for i := 0; i < len(jsonSubSelects); i += chunkSize {
@@ -182,7 +187,8 @@ func processMapping(tableAlias string, mapping *thunder.Mapping, mappingJoins *j
 	}
 
 	if aggregate {
-		return goqu.Func("jsonb_agg", combined), nil
+		//return goqu.Func("jsonb_agg", combined), nil
+		return goqu.Func("JSON_ARRAYAGG", combined), nil
 	}
 
 	return combined, nil
